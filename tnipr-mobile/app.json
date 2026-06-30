@@ -57,7 +57,6 @@
         }
       ],
       "expo-secure-store",
-      "./modules/expo-telephony",
       [
         "react-native-maps",
         {
