@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   Dimensions, Animated, StatusBar, useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -52,7 +52,7 @@ const SLIDES = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const dark = useColorScheme() === 'dark';
-  const flatRef = useRef<FlatList>(null);
+  const flatRef = useRef<any>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [index, setIndex] = useState(0);
 
