@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { RecordingProvider } from '@/context/RecordingContext';
+import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import AppSplashScreen from '@/components/SplashScreen';
 
 function RouteGuard({ onReady }: { onReady: () => void }) {
@@ -77,19 +77,27 @@ function SplashOverlay({ ready }: { ready: boolean }) {
   );
 }
 
-export default function RootLayout() {
-  const scheme = useColorScheme();
+function AppShell() {
+  const { isDark } = useThemeContext();
   const [ready, setReady] = useState(false);
   const markReady = useCallback(() => setReady(true), []);
 
   return (
     <AuthProvider>
       <RecordingProvider>
-        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShown: false }} />
         <RouteGuard onReady={markReady} />
         <SplashOverlay ready={ready} />
       </RecordingProvider>
     </AuthProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <AppShell />
+    </ThemeProvider>
   );
 }

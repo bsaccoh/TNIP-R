@@ -116,6 +116,77 @@ function TestCard({ test, onPress, t }: { test: DriveTest; onPress: () => void; 
   );
 }
 
+function MonthlyChart({ data, t }: { data: any[]; t: ReturnType<typeof useTheme> }) {
+  // Keep last 6 months; normalise field names (byMonth may use snake or camel)
+  const months = data.slice(-6).map((d: any) => ({
+    label: (() => {
+      const raw: string = d.month || d.test_month || '';
+      if (!raw) return '';
+      const [, m] = raw.split('-');
+      return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1] ?? raw;
+    })(),
+    count: d.test_count ?? d.count ?? 0,
+    rsrp: d.avg_rsrp ?? null,
+  }));
+
+  const maxCount = Math.max(...months.map((m) => m.count), 1);
+  const BAR_MAX_H = 72;
+
+  return (
+    <View style={[mc.card, { backgroundColor: t.surface, borderColor: t.border }]}>
+      <Text style={[mc.title, { color: t.text }]}>Monthly Activity</Text>
+      <Text style={[mc.sub, { color: t.textMuted }]}>Tests recorded per month</Text>
+      <View style={mc.chart}>
+        {months.map((m, i) => {
+          const h = Math.max(4, Math.round((m.count / maxCount) * BAR_MAX_H));
+          const color = m.rsrp != null ? rsrpColor(m.rsrp) : palette.primary;
+          return (
+            <View key={i} style={mc.col}>
+              {m.count > 0 && (
+                <Text style={[mc.countLabel, { color: t.textSub }]}>{m.count}</Text>
+              )}
+              <View style={[mc.barTrack, { height: BAR_MAX_H }]}>
+                <View style={[mc.bar, { height: h, backgroundColor: color, bottom: 0 }]} />
+              </View>
+              <Text style={[mc.monthLabel, { color: t.textMuted }]}>{m.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+      {/* Legend */}
+      <View style={mc.legend}>
+        {[
+          { label: 'Excellent', color: '#2E7D32' },
+          { label: 'Good',      color: '#558B2F' },
+          { label: 'Fair',      color: '#F9A825' },
+          { label: 'Poor',      color: '#C62828' },
+        ].map(({ label, color }) => (
+          <View key={label} style={mc.legendItem}>
+            <View style={[mc.legendDot, { backgroundColor: color }]} />
+            <Text style={[mc.legendText, { color: t.textMuted }]}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const mc = StyleSheet.create({
+  card: { borderRadius: 16, borderWidth: 1, padding: 16, marginTop: 12, marginBottom: 4 },
+  title: { fontSize: 13, fontWeight: '700' },
+  sub: { fontSize: 11, marginTop: 2, marginBottom: 14 },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 4 },
+  col: { flex: 1, alignItems: 'center', gap: 4 },
+  countLabel: { fontSize: 10, fontWeight: '700' },
+  barTrack: { width: '100%', justifyContent: 'flex-end', borderRadius: 4, overflow: 'hidden' },
+  bar: { width: '100%', borderRadius: 4, position: 'absolute' },
+  monthLabel: { fontSize: 10, fontWeight: '500' },
+  legend: { flexDirection: 'row', gap: 12, marginTop: 12, flexWrap: 'wrap' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
+  legendText: { fontSize: 10 },
+});
+
 export default function DashboardScreen() {
   const { user } = useAuth();
   const { isAdmin, operatorId } = useRole();
@@ -292,6 +363,11 @@ export default function DashboardScreen() {
             )}
           </>
         ) : null}
+
+        {/* ── MONTHLY TREND ── */}
+        {summary?.byMonth?.length > 0 && (
+          <MonthlyChart data={summary.byMonth} t={t} />
+        )}
 
         {/* ── RECENT TESTS ── */}
         <View style={styles.sectionHeader}>

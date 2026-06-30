@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { useThemeContext } from '@/context/ThemeContext';
 
 export const palette = {
   primary:       '#1565C0',
@@ -39,8 +39,7 @@ export const dark = {
 };
 
 export function useTheme() {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const { isDark } = useThemeContext();
   return { ...(isDark ? dark : light), isDark, palette };
 }
 
