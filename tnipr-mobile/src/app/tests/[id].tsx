@@ -4,7 +4,7 @@ import {
   useColorScheme, ActivityIndicator, FlatList, Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polyline, Marker } from 'react-native-maps';
 import { getAnalysis, getSamples, getCompliance, Sample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel } from '@/utils/signalColor';
 
@@ -103,7 +103,6 @@ export default function TestDetailScreen() {
         <View style={{ flex: 1 }}>
           {mapCoords.length > 0 && midpoint ? (
             <MapView
-              provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
               initialRegion={{ ...midpoint, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
             >

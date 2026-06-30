@@ -56,7 +56,13 @@
           "locationAlwaysPermission": "TNIP-R Drive Tester needs background location to continue recording when the screen is off."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-maps",
+        {
+          "androidMapsApiKey": ""
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

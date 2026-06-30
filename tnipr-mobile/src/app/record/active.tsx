@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { useKeepAwake } from 'expo-keep-awake';
-import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polyline, Marker } from 'react-native-maps';
 import { useRecording } from '@/context/RecordingContext';
 import { appendSamples, endLiveTest, LiveSample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel, sinrColor } from '@/utils/signalColor';
@@ -207,7 +207,6 @@ export default function ActiveScreen() {
       <View style={styles.mapContainer}>
         {lastCoord ? (
           <MapView
-            provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
             region={{ latitude: lastCoord.latitude, longitude: lastCoord.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
           >
