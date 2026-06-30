@@ -4,8 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { RecordingProvider } from '@/context/RecordingContext';
+import AppSplashScreen from '@/components/SplashScreen';
 
-function RouteGuard() {
+function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -17,7 +18,8 @@ function RouteGuard() {
     else if (user && inLogin) router.replace('/(tabs)');
   }, [user, loading, segments]);
 
-  return null;
+  if (loading) return <AppSplashScreen />;
+  return <>{children}</>;
 }
 
 export default function RootLayout() {
@@ -25,9 +27,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <RecordingProvider>
-        <RouteGuard />
-        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShown: false }} />
+        <RouteGuard>
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+          <Stack screenOptions={{ headerShown: false }} />
+        </RouteGuard>
       </RecordingProvider>
     </AuthProvider>
   );
