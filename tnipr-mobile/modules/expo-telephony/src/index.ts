@@ -1,6 +1,7 @@
-import { requireNativeModule } from 'expo-modules-core';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 
-const ExpoTelephony = requireNativeModule('ExpoTelephony');
+// Returns null in Expo Go or if the native build hasn't run yet
+const ExpoTelephony = requireOptionalNativeModule('ExpoTelephony');
 
 export interface SignalMetrics {
   /** LTE/NR reference signal received power (dBm), typically -140 to -44 */
@@ -25,5 +26,6 @@ export interface SignalMetrics {
  * Only available in a development build (not Expo Go).
  */
 export async function getSignalMetrics(): Promise<SignalMetrics> {
+  if (!ExpoTelephony) return {};
   return ExpoTelephony.getSignalStrength();
 }
