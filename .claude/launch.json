@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tnipr-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "cwd": "C:\\Users\\Saccoh1629182\\Documents\\Babah\\BS\\OCS\\project\\babah\\gov\\NTNIP\\frontend"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Result Time,Granularity Period,Object Name,Reliability,"50331654","50331655","50331656"
+,Minutes,,,None,bit/s,per mill
+2026-06-23 00:00+00:00,60,"SL0666_NJALA_R/ULoCell:NodeB Function Name=3G_0666_NJALA_R, Local Cell ID=11, Cell Name=N/A",Reliable,36038,5154,5136
+2026-06-23 00:00+00:00,60,"SL0592_GBONGBOMA/ULoCell:NodeB Function Name=3G_0592_GBONGBOMA, Local Cell ID=34, Cell Name=N/A",Reliable,5266,547,272
+2026-06-23 00:00+00:00,60,"SL0681_BUMBA_R/ULoCell:NodeB Function Name=3G_0681_BUMBA_R, Local Cell ID=11, Cell Name=N/A",Unreliable,0,0,0
