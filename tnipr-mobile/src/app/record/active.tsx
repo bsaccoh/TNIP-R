@@ -9,7 +9,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '@/components/LeafletMap';
 import { useRecording } from '@/context/RecordingContext';
-import { appendSamples, endLiveTest, LiveSample } from '@/api/drivetest';
+import { endLiveTest, LiveSample } from '@/api/drivetest';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { rsrpColor, rsrpLabel, sinrColor } from '@/utils/signalColor';
 import { haversine } from '@/utils/haversine';
 import { useTheme, palette, radius, space, shadow } from '@/theme';
@@ -70,6 +71,8 @@ export default function ActiveScreen() {
   const batchTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  const { flush, pendingCount, syncStatus, lastSyncAt } = useOfflineQueue(session?.testId ?? null);
+
   // Auto-read signal from modem every 5 s (dev build only — not Expo Go)
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -105,14 +108,15 @@ export default function ActiveScreen() {
     return () => anim.stop();
   }, []);
 
-  const flush = useCallback(async () => {
-    if (!session || !batchRef.current.length) return;
+  const flushBatch = useCallback(async () => {
+    if (!batchRef.current.length) return;
     const toSend = [...batchRef.current];
     batchRef.current = [];
-    try { await appendSamples(session.testId, toSend); } catch {
-      batchRef.current = [...toSend, ...batchRef.current];
+    const ok = await flush(toSend);
+    if (!ok) {
+      // flush already enqueued toSend to AsyncStorage on failure
     }
-  }, [session]);
+  }, [flush]);
 
   useEffect(() => {
     if (!session) { router.replace('/record'); return; }
@@ -147,7 +151,7 @@ export default function ActiveScreen() {
       );
     })();
     const timer = setInterval(() => setElapsed((e) => e + 1), 1000);
-    batchTimer.current = setInterval(flush, 10000);
+    batchTimer.current = setInterval(flushBatch, 10000);
     return () => {
       clearInterval(timer);
       if (batchTimer.current) clearInterval(batchTimer.current);
@@ -183,7 +187,7 @@ export default function ActiveScreen() {
       { text: 'End Test', style: 'destructive', onPress: async () => {
         setEnding(true);
         try {
-          await flush();
+          await flushBatch();
           await endLiveTest(session!.testId);
           const id = session!.testId;
           clearSession();
@@ -198,6 +202,12 @@ export default function ActiveScreen() {
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 3600)).padStart(2,'0')}:${String(Math.floor((s % 3600) / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+
+  const fmtAgo = (d: Date) => {
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return `${s}s ago`;
+    return `${Math.floor(s / 60)}m ago`;
+  };
 
   const mapCoords = coords.map((c) => ({ latitude: c.lat, longitude: c.lon, color: rsrpColor(rsrp) }));
   const lastCoord = mapCoords[mapCoords.length - 1];
@@ -244,12 +254,32 @@ export default function ActiveScreen() {
         <Gauge label="DL" value={dl != null ? dl / 1000 : null} unit="Mbps" color={palette.primary} t={t} />
       </View>
 
-      {/* Signal source indicator */}
-      <View style={[styles.signalSourceBar, { backgroundColor: t.surface, borderBottomColor: t.border }]}>
-        <View style={[styles.signalSourceDot, { backgroundColor: autoSignal ? palette.success : palette.warning }]} />
-        <Text style={[styles.signalSourceText, { color: t.textMuted }]}>
-          {autoSignal ? 'Live signal — auto-reading from modem' : 'Manual mode — tap "+ Signal" to log values'}
-        </Text>
+      {/* Unified status strip: sync state (left) + signal source (right) */}
+      <View style={[styles.statusStrip, { backgroundColor: t.surface, borderBottomColor: t.border }]}>
+        {/* Sync indicator */}
+        <View style={styles.statusLeft}>
+          <View style={[styles.statusDot, {
+            backgroundColor:
+              syncStatus === 'ok'      ? palette.success :
+              syncStatus === 'syncing' ? palette.primary  :
+              syncStatus === 'offline' ? palette.error    :
+              syncStatus === 'error'   ? palette.warning  : t.border,
+          }]} />
+          <Text style={[styles.statusText, { color: t.textMuted }]}>
+            {syncStatus === 'syncing' ? 'Uploading…' :
+             syncStatus === 'ok'      ? `Synced${lastSyncAt ? ' ' + fmtAgo(lastSyncAt) : ''}` :
+             syncStatus === 'offline' ? `Offline · ${pendingCount} queued` :
+             syncStatus === 'error'   ? `Upload error · ${pendingCount} queued` :
+             'Waiting for samples'}
+          </Text>
+        </View>
+        {/* Signal source */}
+        <View style={styles.statusRight}>
+          <View style={[styles.statusDot, { backgroundColor: autoSignal ? palette.success : palette.warning }]} />
+          <Text style={[styles.statusText, { color: t.textMuted }]}>
+            {autoSignal ? 'Auto signal' : 'Manual'}
+          </Text>
+        </View>
       </View>
 
       {/* Map */}
@@ -358,9 +388,11 @@ const styles = StyleSheet.create({
   topDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.15)' },
 
   gaugeBar: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.sm, paddingVertical: space.sm },
-  signalSourceBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space.md, paddingVertical: 5, borderBottomWidth: 1 },
-  signalSourceDot: { width: 7, height: 7, borderRadius: 4 },
-  signalSourceText: { fontSize: 11 },
+  statusStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingVertical: 5, borderBottomWidth: 1 },
+  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusRight: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 11 },
 
   mapArea: { flex: 1, overflow: 'hidden' },
   mapPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.sm },

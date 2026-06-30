@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
 import { getSummary, listTests, DriveTest } from '@/api/drivetest';
 import { useTheme, palette, shadow, radius, space } from '@/theme';
@@ -122,6 +123,7 @@ export default function DashboardScreen() {
   const [recent, setRecent] = useState<DriveTest[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingUploads, setPendingUploads] = useState(0);
 
   const load = async () => {
     try {
@@ -131,7 +133,18 @@ export default function DashboardScreen() {
     } catch {} finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  const checkOfflineQueue = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const queueKeys = keys.filter((k) => k.startsWith('offline_queue_'));
+      if (!queueKeys.length) { setPendingUploads(0); return; }
+      const values = await AsyncStorage.multiGet(queueKeys);
+      const total = values.reduce((sum, [, v]) => sum + (v ? JSON.parse(v).length : 0), 0);
+      setPendingUploads(total);
+    } catch {}
+  };
+
+  useEffect(() => { load(); checkOfflineQueue(); }, []);
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const ov = summary?.overall ?? summary ?? {};
@@ -189,6 +202,21 @@ export default function DashboardScreen() {
         {/* Curved bottom cap */}
         <View style={styles.heroCurve} />
       </View>
+
+      {/* ── OFFLINE BANNER ── */}
+      {pendingUploads > 0 && (
+        <TouchableOpacity
+          style={styles.offlineBanner}
+          onPress={() => router.push('/tests/upload')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+          <Text style={styles.offlineBannerText}>
+            {pendingUploads} sample{pendingUploads !== 1 ? 's' : ''} pending upload — tap to review
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+      )}
 
       {/* ── QUICK ACTIONS ── */}
       <View style={styles.actionsRow}>
@@ -334,6 +362,15 @@ const styles = StyleSheet.create({
     height: 40, backgroundColor: 'transparent',
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
   },
+
+  // ── Offline banner ──
+  offlineBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: space.lg, marginTop: space.md,
+    backgroundColor: '#B71C1C', borderRadius: radius.md,
+    paddingHorizontal: space.md, paddingVertical: 10,
+  },
+  offlineBannerText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // ── Quick actions ──
   actionsRow: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.lg, marginTop: space.lg, marginBottom: space.lg },
