@@ -73,15 +73,15 @@ docker compose up --build
 
 - API: `http://localhost:8080/api/v1`  ·  Swagger: `http://localhost:8080/docs`
 - MySQL schema + seed load automatically on first DB init.
-
-  (override via `ADMIN_EMAIL` / `ADMIN_PASSWORD`). **Change in production.**
+- Default admin credentials are set via `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your `.env` file.
+  **Change these before deploying to production.**
 
 ## Try the pipeline
 
 ```bash
-# 1. login
+# 1. login (use credentials from your .env ADMIN_EMAIL / ADMIN_PASSWORD)
 TOKEN=$(curl -s localhost:8080/api/v1/auth/login -H 'content-type: application/json' \
-  -d '{"email":"admin@tnipr.gov","password":"Admin@12345"}' | jq -r .data.accessToken)
+  -d '{"email":"<ADMIN_EMAIL>","password":"<ADMIN_PASSWORD>"}' | jq -r .data.accessToken)
 
 # 2. upload a Huawei PM CSV for Orange (operator_id=1) — auto KPI + compliance
 curl -s localhost:8080/api/v1/ingestion/upload -H "Authorization: Bearer $TOKEN" \
