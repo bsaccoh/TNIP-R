@@ -13,6 +13,7 @@ import { appendSamples, endLiveTest, LiveSample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel, sinrColor } from '@/utils/signalColor';
 import { haversine } from '@/utils/haversine';
 import { useTheme, palette, radius, space, shadow } from '@/theme';
+import { getSignalMetrics } from 'expo-telephony';
 
 const { width } = Dimensions.get('window');
 
@@ -62,10 +63,35 @@ export default function ActiveScreen() {
   const [mEvent, setMEvent] = useState('');
   const [ending, setEnding] = useState(false);
 
+  const [autoSignal, setAutoSignal] = useState(false);
+
   const batchRef = useRef<LiveSample[]>([]);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
   const batchTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Auto-read signal from modem every 5 s (dev build only — not Expo Go)
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const poll = async () => {
+      try {
+        const m = await getSignalMetrics();
+        if (m.error) return; // permission denied or unavailable
+        setAutoSignal(true);
+        if (m.rsrp != null)          setRsrp(m.rsrp);
+        if (m.rsrq != null)          setRsrq(m.rsrq);
+        if (m.sinr != null)          setSinr(Number(m.sinr.toFixed(1)));
+        if (m.dl_throughput != null) setDl(m.dl_throughput);
+      } catch {
+        // Module not available in Expo Go — silently ignore
+      }
+    };
+
+    poll();
+    timer = setInterval(poll, 5000);
+    return () => { if (timer) clearInterval(timer); };
+  }, []);
 
   // Pulsing recording dot
   useEffect(() => {
@@ -218,6 +244,14 @@ export default function ActiveScreen() {
         <Gauge label="DL" value={dl != null ? dl / 1000 : null} unit="Mbps" color={palette.primary} t={t} />
       </View>
 
+      {/* Signal source indicator */}
+      <View style={[styles.signalSourceBar, { backgroundColor: t.surface, borderBottomColor: t.border }]}>
+        <View style={[styles.signalSourceDot, { backgroundColor: autoSignal ? palette.success : palette.warning }]} />
+        <Text style={[styles.signalSourceText, { color: t.textMuted }]}>
+          {autoSignal ? 'Live signal — auto-reading from modem' : 'Manual mode — tap "+ Signal" to log values'}
+        </Text>
+      </View>
+
       {/* Map */}
       <View style={styles.mapArea}>
         {lastCoord ? (
@@ -324,6 +358,9 @@ const styles = StyleSheet.create({
   topDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.15)' },
 
   gaugeBar: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.sm, paddingVertical: space.sm },
+  signalSourceBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space.md, paddingVertical: 5, borderBottomWidth: 1 },
+  signalSourceDot: { width: 7, height: 7, borderRadius: 4 },
+  signalSourceText: { fontSize: 11 },
 
   mapArea: { flex: 1, overflow: 'hidden' },
   mapPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.sm },
