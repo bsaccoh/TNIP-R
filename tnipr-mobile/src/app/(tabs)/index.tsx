@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
+import { useRole } from '@/hooks/useRole';
 import { getSummary, listTests, DriveTest } from '@/api/drivetest';
 import { useTheme, palette, shadow, radius, space } from '@/theme';
 import { rsrpColor, rsrpLabel } from '@/utils/signalColor';
@@ -117,6 +118,7 @@ function TestCard({ test, onPress, t }: { test: DriveTest; onPress: () => void; 
 
 export default function DashboardScreen() {
   const { user } = useAuth();
+  const { isAdmin, operatorId } = useRole();
   const router = useRouter();
   const t = useTheme();
   const [summary, setSummary] = useState<any>(null);
@@ -127,7 +129,11 @@ export default function DashboardScreen() {
 
   const load = async () => {
     try {
-      const [s, tests] = await Promise.all([getSummary(), listTests()]);
+      // Field testers only see their own operator's tests
+      const [s, tests] = await Promise.all([
+        getSummary(),
+        listTests(isAdmin ? undefined : operatorId ?? undefined),
+      ]);
       setSummary(s);
       setRecent(tests.slice(0, 6));
     } catch {} finally { setLoading(false); }
@@ -172,7 +178,14 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.heroDate}>{getDateLabel()}</Text>
-            <Text style={styles.heroRole}>{user?.role?.replace(/_/g, ' ')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.heroRole}>{user?.role?.replace(/_/g, ' ')}</Text>
+              {isAdmin && (
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>ADMIN</Text>
+                </View>
+              )}
+            </View>
           </View>
           <TouchableOpacity style={styles.heroBell}>
             <Ionicons name="notifications-outline" size={20} color="rgba(255,255,255,0.85)" />
@@ -339,6 +352,8 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   heroDate: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '500' },
   heroRole: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', marginTop: 1 },
+  adminBadge: { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  adminBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
   heroBell: {
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.1)',

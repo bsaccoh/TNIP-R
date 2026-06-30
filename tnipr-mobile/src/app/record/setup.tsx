@@ -7,9 +7,11 @@ import { useRouter } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useRole } from '@/hooks/useRole';
 import { useRecording } from '@/context/RecordingContext';
 import { createLiveTest, getOperators } from '@/api/drivetest';
 import { useTheme, palette, shadow, radius, space } from '@/theme';
+import { useServerStatus } from '@/hooks/useServerStatus';
 
 const TECHS = [
   { label: '2G', color: '#546E7A' },
@@ -33,6 +35,7 @@ function SectionLabel({ children }: { children: string }) {
 export default function SetupScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isAdmin } = useRole();
   const { startSession } = useRecording();
   const t = useTheme();
 
@@ -46,6 +49,7 @@ export default function SetupScreen() {
   const [notes, setNotes] = useState('');
   const [starting, setStarting] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
+  const { status: serverStatus, latency, recheck } = useServerStatus(30_000);
 
   useEffect(() => {
     getOperators().then((ops) => {
@@ -100,9 +104,19 @@ export default function SetupScreen() {
           <Text style={s.headerTitle}>New Drive Test</Text>
           <Text style={s.headerSub}>Configure before recording</Text>
         </View>
-        <View style={s.headerIcon}>
-          <Ionicons name="radio-button-on" size={22} color="rgba(255,255,255,0.7)" />
-        </View>
+        <TouchableOpacity style={s.serverPill} onPress={recheck} activeOpacity={0.7}>
+          <View style={[s.serverDot, {
+            backgroundColor:
+              serverStatus === 'online'   ? '#69F0AE' :
+              serverStatus === 'offline'  ? '#FF5252' :
+              serverStatus === 'checking' ? '#FFD740' : '#78909C',
+          }]} />
+          <Text style={s.serverPillText}>
+            {serverStatus === 'online'   ? (latency != null ? `${latency}ms` : 'Online') :
+             serverStatus === 'offline'  ? 'Offline' :
+             serverStatus === 'checking' ? '…' : 'No URL'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
@@ -121,14 +135,25 @@ export default function SetupScreen() {
             onBlur={() => setFocused(null)}
           />
 
-          <Text style={[s.fieldLabel, { color: t.textSub }]}>Operator *</Text>
-          <View style={[s.pickerWrap, { borderColor: t.border, backgroundColor: t.inputBg }]}>
-            <Picker selectedValue={operatorId} onValueChange={setOperatorId} style={{ color: t.text }}>
-              {operators.map((o) => (
-                <Picker.Item key={o.operator_id} label={o.operator_name} value={o.operator_id} />
-              ))}
-            </Picker>
-          </View>
+          <Text style={[s.fieldLabel, { color: t.textSub }]}>
+            Operator *{!isAdmin && <Text style={{ color: t.textMuted, fontWeight: '400' }}> (locked to your account)</Text>}
+          </Text>
+          {isAdmin ? (
+            <View style={[s.pickerWrap, { borderColor: t.border, backgroundColor: t.inputBg }]}>
+              <Picker selectedValue={operatorId} onValueChange={setOperatorId} style={{ color: t.text }}>
+                {operators.map((o) => (
+                  <Picker.Item key={o.operator_id} label={o.operator_name} value={o.operator_id} />
+                ))}
+              </Picker>
+            </View>
+          ) : (
+            <View style={[s.lockedField, { borderColor: t.border, backgroundColor: t.inputBg }]}>
+              <Ionicons name="lock-closed-outline" size={14} color={t.textMuted} />
+              <Text style={[s.lockedText, { color: t.text }]}>
+                {operators.find((o) => o.operator_id === operatorId)?.operator_name ?? 'Your operator'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Technology */}
@@ -206,9 +231,23 @@ export default function SetupScreen() {
           />
         </View>
 
+        {/* Offline warning */}
+        {serverStatus === 'offline' && (
+          <TouchableOpacity style={s.offlineWarning} onPress={recheck} activeOpacity={0.8}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#C62828" />
+            <Text style={s.offlineWarningText}>Server unreachable — samples will queue offline. Tap to retry.</Text>
+          </TouchableOpacity>
+        )}
+        {serverStatus === 'unknown' && (
+          <View style={s.offlineWarning}>
+            <Ionicons name="warning-outline" size={16} color="#F57C00" />
+            <Text style={s.offlineWarningText}>No server URL configured. Go to Settings to set one.</Text>
+          </View>
+        )}
+
         {/* Start button */}
         <TouchableOpacity
-          style={[s.startBtn, { backgroundColor: palette.primary, opacity: starting ? 0.75 : 1 }]}
+          style={[s.startBtn, { backgroundColor: serverStatus === 'offline' ? '#B71C1C' : palette.primary, opacity: starting ? 0.75 : 1 }]}
           onPress={start}
           disabled={starting}
           activeOpacity={0.85}
@@ -217,8 +256,8 @@ export default function SetupScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Ionicons name="radio-button-on" size={20} color="#fff" />
-              <Text style={s.startBtnText}>Start Recording</Text>
+              <Ionicons name={serverStatus === 'offline' ? 'cloud-offline-outline' : 'radio-button-on'} size={20} color="#fff" />
+              <Text style={s.startBtnText}>{serverStatus === 'offline' ? 'Start Offline' : 'Start Recording'}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -232,7 +271,13 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 1 },
-  headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  lockedField: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radius.sm, padding: 12, opacity: 0.7 },
+  lockedText: { fontSize: 14 },
+  serverPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
+  serverDot: { width: 8, height: 8, borderRadius: 4 },
+  serverPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  offlineWarning: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFEBEE', borderRadius: radius.md, padding: 12, marginTop: space.md, borderWidth: 1, borderColor: '#FFCDD2' },
+  offlineWarningText: { flex: 1, fontSize: 12, color: '#C62828', lineHeight: 17 },
 
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: space.sm, marginTop: space.lg },
   card: { borderRadius: radius.lg, borderWidth: 1, padding: space.md, shadowColor: '#000' },
