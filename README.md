@@ -73,7 +73,7 @@ docker compose up --build
 
 - API: `http://localhost:8080/api/v1`  ·  Swagger: `http://localhost:8080/docs`
 - MySQL schema + seed load automatically on first DB init.
-- Default admin (created on backend boot): **admin@tnipr.gov / Admin@12345**
+
   (override via `ADMIN_EMAIL` / `ADMIN_PASSWORD`). **Change in production.**
 
 ## Try the pipeline
