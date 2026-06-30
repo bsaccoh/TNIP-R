@@ -4,7 +4,7 @@ import {
   useColorScheme, ActivityIndicator, FlatList, Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import LeafletMap from '@/components/LeafletMap';
 import { getAnalysis, getSamples, getCompliance, Sample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel } from '@/utils/signalColor';
 
@@ -82,8 +82,7 @@ export default function TestDetailScreen() {
   const stats = analysis?.stats;
   const mapCoords = samples
     .filter((s) => s.latitude && s.longitude)
-    .map((s) => ({ latitude: Number(s.latitude), longitude: Number(s.longitude) }));
-  const midpoint = mapCoords[Math.floor(mapCoords.length / 2)];
+    .map((s) => ({ latitude: Number(s.latitude), longitude: Number(s.longitude), color: rsrpColor(s.rsrp) }));
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -101,19 +100,8 @@ export default function TestDetailScreen() {
       {/* MAP TAB */}
       {tab === 'Map' && (
         <View style={{ flex: 1 }}>
-          {mapCoords.length > 0 && midpoint ? (
-            <MapView
-              style={StyleSheet.absoluteFill}
-              initialRegion={{ ...midpoint, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
-            >
-              <Polyline
-                coordinates={mapCoords}
-                strokeColors={samples.filter((s) => s.latitude && s.longitude).map((s) => rsrpColor(s.rsrp))}
-                strokeWidth={4}
-              />
-              <Marker coordinate={mapCoords[0]} pinColor={GREEN} title="Start" />
-              <Marker coordinate={mapCoords[mapCoords.length - 1]} pinColor={RED} title="End" />
-            </MapView>
+          {mapCoords.length > 1 ? (
+            <LeafletMap coordinates={mapCoords} />
           ) : (
             <View style={styles.centered}>
               <Text style={{ color: sub }}>No GPS data available for this test.</Text>

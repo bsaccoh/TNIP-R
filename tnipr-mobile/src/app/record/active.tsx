@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { useKeepAwake } from 'expo-keep-awake';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import LeafletMap from '@/components/LeafletMap';
 import { useRecording } from '@/context/RecordingContext';
 import { appendSamples, endLiveTest, LiveSample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel, sinrColor } from '@/utils/signalColor';
@@ -168,7 +168,7 @@ export default function ActiveScreen() {
 
   const fmt = (s: number) => `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const mapCoords = coords.map((c) => ({ latitude: c.lat, longitude: c.lon }));
+  const mapCoords = coords.map((c) => ({ latitude: c.lat, longitude: c.lon, color: rsrpColor(rsrp) }));
   const lastCoord = mapCoords[mapCoords.length - 1];
   const bg = dark ? '#0A0A0A' : '#F5F7FA';
   const text = dark ? '#fff' : '#212121';
@@ -206,17 +206,7 @@ export default function ActiveScreen() {
       {/* Map */}
       <View style={styles.mapContainer}>
         {lastCoord ? (
-          <MapView
-            style={StyleSheet.absoluteFill}
-            region={{ latitude: lastCoord.latitude, longitude: lastCoord.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
-          >
-            {mapCoords.length > 1 && (
-              <Polyline coordinates={mapCoords} strokeColor={BLUE} strokeWidth={3} />
-            )}
-            {lastCoord && (
-              <Marker coordinate={lastCoord} pinColor={RED} />
-            )}
-          </MapView>
+          <LeafletMap coordinates={mapCoords} live style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[styles.mapPlaceholder, { backgroundColor: dark ? '#1A1A1A' : '#E8EAF6' }]}>
             <Text style={{ color: sub, fontSize: 14 }}>Waiting for GPS fix…</Text>
