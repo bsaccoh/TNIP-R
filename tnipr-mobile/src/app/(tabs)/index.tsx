@@ -12,6 +12,24 @@ const TECH_COLORS: Record<string, string> = {
   '3G': palette.warning, '2G': '#546E7A',
 };
 
+// Known operator brand colors (case-insensitive substring match)
+const OPERATOR_COLORS: { match: string; color: string }[] = [
+  { match: 'orange',   color: '#F57C00' },
+  { match: 'qcell',    color: '#C62828' },
+  { match: 'africell', color: '#1565C0' },
+  { match: 'sierratel',color: '#2E7D32' },
+  { match: 'comium',   color: '#6A1B9A' },
+  { match: 'lonestar', color: '#00838F' },
+];
+
+const FALLBACK_COLORS = ['#1565C0', '#C62828', '#2E7D32', '#F57C00', '#6A1B9A', '#00838F', '#546E7A'];
+
+function operatorColor(name: string, index: number): string {
+  const lower = (name || '').toLowerCase();
+  const match = OPERATOR_COLORS.find((o) => lower.includes(o.match));
+  return match ? match.color : FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+}
+
 function getTimeOfDay() {
   const h = new Date().getHours();
   if (h < 12) return 'Morning';
@@ -212,18 +230,23 @@ export default function DashboardScreen() {
             {summary?.perOperator?.length > 0 && (
               <View style={[styles.opCard, { backgroundColor: t.surface, borderColor: t.border }, shadow.sm]}>
                 <Text style={[styles.opCardTitle, { color: t.text }]}>Coverage by Operator</Text>
-                {summary.perOperator.map((op: any) => (
-                  <View key={op.operator_name} style={styles.opRow}>
-                    <Text style={[styles.opName, { color: t.textSub }]}>{op.operator_name}</Text>
-                    <View style={[styles.opBar, { backgroundColor: t.border }]}>
-                      <View style={[styles.opBarFill, {
-                        width: `${Math.min(100, ((op.total_tests || 0) / (ov.total_tests || 1)) * 100)}%` as any,
-                        backgroundColor: palette.primary,
-                      }]} />
+                {summary.perOperator.map((op: any, i: number) => {
+                  const color = operatorColor(op.operator_name, i);
+                  const pct = Math.min(100, ((op.total_tests || 0) / (ov.total_tests || 1)) * 100);
+                  return (
+                    <View key={op.operator_name} style={styles.opRow}>
+                      <View style={[styles.opDot, { backgroundColor: color }]} />
+                      <Text style={[styles.opName, { color: t.text }]}>{op.operator_name}</Text>
+                      <View style={[styles.opBar, { backgroundColor: t.border }]}>
+                        <View style={[styles.opBarFill, {
+                          width: `${pct}%` as any,
+                          backgroundColor: color,
+                        }]} />
+                      </View>
+                      <Text style={[styles.opCount, { color }]}>{op.total_tests}</Text>
                     </View>
-                    <Text style={[styles.opCount, { color: palette.primary }]}>{op.total_tests}</Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </>
@@ -334,8 +357,9 @@ const styles = StyleSheet.create({
   // ── Operator card ──
   opCard: { borderRadius: radius.lg, padding: space.md, borderWidth: 1, marginTop: space.md, marginBottom: 4, shadowColor: '#000' },
   opCardTitle: { fontSize: 13, fontWeight: '700', marginBottom: 12 },
-  opRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  opName: { fontSize: 12, width: 80 },
+  opRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  opDot: { width: 9, height: 9, borderRadius: 5 },
+  opName: { fontSize: 12, fontWeight: '600', width: 78 },
   opBar: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   opBarFill: { height: 6, borderRadius: 3 },
   opCount: { fontSize: 12, fontWeight: '700', width: 24, textAlign: 'right' },
