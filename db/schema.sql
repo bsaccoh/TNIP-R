@@ -29,6 +29,16 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Per-user permission overrides. Grants listed here are ADDED on top of
+-- the user's role defaults. Dropped automatically when the user is deleted.
+CREATE TABLE IF NOT EXISTS user_permissions (
+  user_id  INT NOT NULL,
+  perm_key VARCHAR(80) NOT NULL,
+  PRIMARY KEY (user_id, perm_key),
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  INDEX idx_up_user (user_id)
+) ENGINE=InnoDB;
+
 -- operators declared below users via FK; create operators first.
 CREATE TABLE IF NOT EXISTS operators (
   operator_id    INT AUTO_INCREMENT PRIMARY KEY,

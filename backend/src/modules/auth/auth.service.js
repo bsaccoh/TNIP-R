@@ -114,8 +114,25 @@ export async function me(userId) {
   );
   if (!rows.length) throw ApiError.notFound('User not found');
   const u = rows[0];
+
+  // Effective permissions = role defaults ∪ per-user grants
+  const [rolePerms, userPerms] = await Promise.all([
+    query(
+      `SELECT p.perm_key FROM permissions p
+         JOIN role_permissions rp ON rp.permission_id = p.permission_id
+         JOIN roles r ON r.role_id = rp.role_id
+        WHERE r.role_key = :role`,
+      { role: u.role_key }
+    ),
+    query('SELECT perm_key FROM user_permissions WHERE user_id = :uid', { uid: u.user_id }),
+  ]);
+  const permissions = [
+    ...new Set([...rolePerms.map((p) => p.perm_key), ...userPerms.map((p) => p.perm_key)]),
+  ];
+
   return {
     userId: u.user_id, email: u.email, fullName: u.full_name,
     role: u.role_key, operatorId: u.operator_id, operatorName: u.operator_name,
+    permissions,
   };
 }

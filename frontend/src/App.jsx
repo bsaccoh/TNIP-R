@@ -58,24 +58,24 @@ export default function App() {
         <Route path="map" element={<CoverageMap />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="ingestion" element={<Ingestion />} />
-        <Route path="operators" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Operators /></RoleGuard>} />
-        <Route path="assistant" element={<AiAssistant />} />
-        <Route path="counters" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']}><CounterDictionary /></RoleGuard>} />
-        <Route path="kpis" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><KpiBuilder /></RoleGuard>} />
+        <Route path="operators" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['operators:read','operators:write']}><Operators /></RoleGuard>} />
+        <Route path="assistant" element={<RoleGuard permissions={['ai:read']}><AiAssistant /></RoleGuard>} />
+        <Route path="counters" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['kpi:read']}><CounterDictionary /></RoleGuard>} />
+        <Route path="kpis" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['kpi:write']}><KpiBuilder /></RoleGuard>} />
         <Route path="analytics" element={<KpiAnalytics />} />
-        <Route path="reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']}><Reports /></RoleGuard>} />
+        <Route path="reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><Reports /></RoleGuard>} />
         <Route path="drive-test" element={<DriveTest />} />
         <Route path="drive-test-analytics" element={<DriveTestAnalytics />} />
         <Route path="drive-test-config" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','DRIVE_TEST_USER']}><DriveTestConfig /></RoleGuard>} />
-        <Route path="users" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Users /></RoleGuard>} />
+        <Route path="users" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['users:write']}><Users /></RoleGuard>} />
         <Route path="settings" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Settings /></RoleGuard>} />
-        <Route path="thresholds" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Thresholds /></RoleGuard>} />
+        <Route path="thresholds" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['compliance:write']}><Thresholds /></RoleGuard>} />
         <Route path="licenses" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Licenses /></RoleGuard>} />
-        <Route path="scheduled-reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><ScheduledReports /></RoleGuard>} />
+        <Route path="scheduled-reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['reports:read']}><ScheduledReports /></RoleGuard>} />
         <Route path="data-quality" element={<DataQuality />} />
         <Route path="anomalies" element={<Anomalies />} />
         <Route path="audit-log" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><AuditLog /></RoleGuard>} />
-        <Route path="compliance-notices" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><ComplianceNotices /></RoleGuard>} />
+        <Route path="compliance-notices" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['compliance:read']}><ComplianceNotices /></RoleGuard>} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

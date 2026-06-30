@@ -9,6 +9,7 @@ const createSchema = z.object({
   fullName: z.string().optional(),
   roleKey: z.string(),
   operatorId: z.number().optional().nullable(),
+  permissions: z.array(z.string()).optional().default([]),
 });
 
 const updateSchema = z.object({
@@ -16,6 +17,7 @@ const updateSchema = z.object({
   roleKey: z.string().optional(),
   operatorId: z.number().optional().nullable(),
   isActive: z.boolean().optional(),
+  permissions: z.array(z.string()).optional(),
 });
 
 const resetSchema = z.object({ newPassword: z.string().min(8) });

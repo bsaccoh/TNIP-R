@@ -3,7 +3,7 @@ import {
   Box, Card, CardContent, Typography, Table, TableHead, TableBody, TableRow, TableCell,
   Chip, Stack, Button, IconButton, Tooltip, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, Alert,
-  Switch, FormControlLabel, TablePagination, InputAdornment,
+  Switch, FormControlLabel, TablePagination, InputAdornment, Checkbox, Divider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -21,12 +21,105 @@ const ROLE_COLOR = {
   OPERATOR_USER: 'default',
 };
 
+// Maps page/module labels to the permission keys that control access.
+// read: null means the page is write-only (no separate read gate).
+// write: null means the page only has a read gate.
+const PAGE_PERMISSIONS = [
+  { label: 'Operators',        read: 'operators:read',  write: 'operators:write'  },
+  { label: 'KPIs & Analytics', read: 'kpi:read',        write: 'kpi:write'        },
+  { label: 'Compliance',       read: 'compliance:read', write: 'compliance:write' },
+  { label: 'Reports',          read: 'reports:read',    write: null               },
+  { label: 'AI Assistant',     read: 'ai:read',         write: null               },
+  { label: 'Data Ingestion',   read: null,              write: 'ingestion:write'  },
+  { label: 'User Management',  read: null,              write: 'users:write'      },
+];
+
+function PagePermissionsPanel({ permissions, onChange }) {
+  const toggle = (key, isWrite) => {
+    onChange((prev) => {
+      if (prev.includes(key)) {
+        // Unchecking read → also remove paired write
+        if (!isWrite) {
+          const pairedWrite = PAGE_PERMISSIONS.find((p) => p.read === key)?.write;
+          return prev.filter((k) => k !== key && k !== pairedWrite);
+        }
+        // Unchecking write → remove write only
+        return prev.filter((k) => k !== key);
+      } else {
+        // Checking write → also add paired read
+        if (isWrite) {
+          const pairedRead = PAGE_PERMISSIONS.find((p) => p.write === key)?.read;
+          return [...new Set([...prev, key, ...(pairedRead ? [pairedRead] : [])])];
+        }
+        // Checking read only
+        return [...new Set([...prev, key])];
+      }
+    });
+  };
+
+  return (
+    <Box>
+      <Divider sx={{ my: 1 }} />
+      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+        Page Access
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+        These grants are <em>added on top of</em> the user's role defaults. Leave all unchecked to rely solely on the role.
+      </Typography>
+
+      <Table size="small" sx={{ '& td, & th': { px: 1, py: 0.5 } }}>
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 700, width: '55%' }}>Page / Module</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 700, width: '22%' }}>Read</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 700, width: '23%' }}>Write</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {PAGE_PERMISSIONS.map(({ label, read, write }) => (
+            <TableRow key={label} hover>
+              <TableCell>
+                <Typography variant="body2">{label}</Typography>
+              </TableCell>
+              <TableCell align="center">
+                {read ? (
+                  <Checkbox
+                    size="small"
+                    checked={permissions.includes(read)}
+                    onChange={() => toggle(read, false)}
+                    sx={{ p: 0.5 }}
+                  />
+                ) : (
+                  <Typography variant="caption" color="text.disabled">—</Typography>
+                )}
+              </TableCell>
+              <TableCell align="center">
+                {write ? (
+                  <Checkbox
+                    size="small"
+                    checked={permissions.includes(write)}
+                    onChange={() => toggle(write, true)}
+                    sx={{ p: 0.5 }}
+                  />
+                ) : (
+                  <Typography variant="caption" color="text.disabled">—</Typography>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
 function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
   const isEdit = Boolean(user);
   const [form, setForm] = useState({
     email: '', password: '', fullName: '', roleKey: 'REGULATOR_ANALYST',
     operatorId: '', isActive: true,
   });
+  const [permissions, setPermissions] = useState([]);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -37,8 +130,10 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
         roleKey: user.role_key, operatorId: user.operator_id || '',
         isActive: Boolean(user.is_active),
       });
+      setPermissions(user.custom_permissions || []);
     } else {
       setForm({ email: '', password: '', fullName: '', roleKey: 'REGULATOR_ANALYST', operatorId: '', isActive: true });
+      setPermissions([]);
     }
     setErr('');
   }, [user, open]);
@@ -55,6 +150,7 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
           roleKey: form.roleKey,
           operatorId: form.operatorId ? Number(form.operatorId) : null,
           isActive: form.isActive,
+          permissions,
         });
       } else {
         if (!form.password) { setErr('Password is required'); setSaving(false); return; }
@@ -62,6 +158,7 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
           email: form.email, password: form.password, fullName: form.fullName,
           roleKey: form.roleKey,
           operatorId: form.operatorId ? Number(form.operatorId) : null,
+          permissions,
         });
       }
       onSaved();
@@ -78,6 +175,7 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
       <DialogTitle>{isEdit ? 'Edit User' : 'Add User'}</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
         {err && <Alert severity="error">{err}</Alert>}
+
         {!isEdit && (
           <TextField label="Email" type="email" fullWidth value={form.email} onChange={set('email')} required />
         )}
@@ -104,6 +202,8 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
             label="Active"
           />
         )}
+
+        <PagePermissionsPanel permissions={permissions} onChange={setPermissions} />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
@@ -226,6 +326,7 @@ export default function Users() {
                       <TableCell>Email</TableCell>
                       <TableCell>Role</TableCell>
                       <TableCell>Operator</TableCell>
+                      <TableCell>Extra Permissions</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Last Login</TableCell>
                       <TableCell align="right">Actions</TableCell>
@@ -240,6 +341,17 @@ export default function Users() {
                           <Chip size="small" label={u.role_key} color={ROLE_COLOR[u.role_key] || 'default'} />
                         </TableCell>
                         <TableCell>{u.operator_name || '—'}</TableCell>
+                        <TableCell>
+                          {u.custom_permissions?.length > 0 ? (
+                            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                              {u.custom_permissions.map((p) => (
+                                <Chip key={p} size="small" label={p} variant="outlined" sx={{ fontSize: 10 }} />
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Typography variant="caption" color="text.disabled">Role defaults</Typography>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Chip size="small" label={u.is_active ? 'Active' : 'Inactive'}
                             color={u.is_active ? 'success' : 'default'} />

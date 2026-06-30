@@ -25,8 +25,11 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data } = await post('/auth/login', { email, password });
     tokenStore.set({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-    setUser(data.user);
-    return data.user;
+    // Load full profile (includes effective permissions) instead of the bare login payload
+    const { data: meData } = await api.get('/auth/me');
+    const fullUser = meData.data ?? meData;
+    setUser(fullUser);
+    return fullUser;
   };
 
   const logout = async () => {

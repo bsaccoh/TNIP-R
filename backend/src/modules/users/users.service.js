@@ -2,20 +2,37 @@ import bcrypt from 'bcryptjs';
 import { query } from '../../config/db.js';
 import { ApiError } from '../../utils/ApiError.js';
 
+async function setUserPermissions(userId, permKeys) {
+  await query('DELETE FROM user_permissions WHERE user_id = :uid', { uid: userId });
+  for (const key of permKeys) {
+    await query(
+      'INSERT IGNORE INTO user_permissions (user_id, perm_key) VALUES (:uid, :key)',
+      { uid: userId, key }
+    );
+  }
+}
+
 export async function listUsers() {
-  return query(
+  const rows = await query(
     `SELECT u.user_id, u.email, u.full_name, u.is_active, u.mfa_enabled,
             u.last_login_at, u.created_at, r.role_key, r.name AS role_name,
-            o.operator_name
+            o.operator_name,
+            GROUP_CONCAT(up.perm_key ORDER BY up.perm_key SEPARATOR ',') AS custom_permissions
        FROM users u
        JOIN roles r ON r.role_id = u.role_id
        LEFT JOIN operators o ON o.operator_id = u.operator_id
+       LEFT JOIN user_permissions up ON up.user_id = u.user_id
       WHERE u.deleted_at IS NULL
+      GROUP BY u.user_id
       ORDER BY u.created_at DESC`
   );
+  return rows.map((u) => ({
+    ...u,
+    custom_permissions: u.custom_permissions ? u.custom_permissions.split(',') : [],
+  }));
 }
 
-export async function createUser({ email, password, fullName, roleKey, operatorId }) {
+export async function createUser({ email, password, fullName, roleKey, operatorId, permissions = [] }) {
   const [existing] = await query('SELECT user_id FROM users WHERE email = :email AND deleted_at IS NULL', { email });
   if (existing) throw ApiError.conflict('Email already in use');
 
@@ -28,10 +45,13 @@ export async function createUser({ email, password, fullName, roleKey, operatorI
      VALUES (:email, :hash, :name, :rid, :opId, 1)`,
     { email, hash, name: fullName || null, rid: role.role_id, opId: operatorId || null }
   );
+
+  if (permissions.length) await setUserPermissions(result.insertId, permissions);
+
   return { userId: result.insertId, email, fullName, roleKey };
 }
 
-export async function updateUser(userId, { fullName, roleKey, operatorId, isActive }) {
+export async function updateUser(userId, { fullName, roleKey, operatorId, isActive, permissions }) {
   const [user] = await query('SELECT user_id FROM users WHERE user_id = :id AND deleted_at IS NULL', { id: userId });
   if (!user) throw ApiError.notFound('User not found');
 
@@ -52,6 +72,9 @@ export async function updateUser(userId, { fullName, roleKey, operatorId, isActi
   if (fields.length) {
     await query(`UPDATE users SET ${fields.join(', ')} WHERE user_id = :id`, params);
   }
+
+  if (permissions !== undefined) await setUserPermissions(userId, permissions);
+
   return { userId };
 }
 
