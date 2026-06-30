@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAnalysis, getCompliance } from '@/api/drivetest';
 import { rsrpLabel, rsrpColor } from '@/utils/signalColor';
 import { useTheme, palette, shadow, radius, space } from '@/theme';
+import { exportReportAsPdf, ReportData } from '@/utils/exportReport';
 
 const DIST_BANDS = [
   { label: 'Excellent', range: '≥ −80 dBm',   key: 'rsrp_excellent', color: palette.success },
@@ -41,6 +42,7 @@ export default function ResultScreen() {
   const [analysis, setAnalysis] = useState<any>(null);
   const [compliance, setCompliance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -83,6 +85,34 @@ export default function ResultScreen() {
     overallResult === 'MARGINAL' ? 'warning'          : 'close-circle';
   const passedChecks = compliance?.checks?.filter((c: any) => c.pass).length ?? 0;
   const totalChecks  = compliance?.checks?.length ?? 0;
+
+  const handleExport = async () => {
+    if (!analysis || exporting) return;
+    setExporting(true);
+    try {
+      const reportData: ReportData = {
+        meta: m ?? {},
+        stats: s ?? {},
+        compliance: {
+          status: overallResult,
+          checks_passed: passedChecks,
+          checks_total: totalChecks,
+          checks: compliance?.checks?.map((c: any) => ({
+            label: c.label,
+            actual: c.actual,
+            required: c.required,
+            passed: c.pass,
+          })) ?? [],
+        },
+      };
+      await exportReportAsPdf(reportData);
+    } catch (e: any) {
+      const { Alert } = await import('react-native');
+      Alert.alert('Export failed', e?.message ?? 'Could not generate PDF.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -238,6 +268,20 @@ export default function ResultScreen() {
             <Text style={styles.primaryBtnText}>View Full Report & Map</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={[styles.exportBtn, { backgroundColor: resultColor + '15', borderColor: resultColor + '50' }]}
+            onPress={handleExport}
+            disabled={exporting}
+            activeOpacity={0.8}
+          >
+            {exporting
+              ? <ActivityIndicator size="small" color={resultColor} />
+              : <Ionicons name="share-outline" size={17} color={resultColor} />}
+            <Text style={[styles.exportBtnText, { color: resultColor }]}>
+              {exporting ? 'Generating PDF…' : 'Export PDF Report'}
+            </Text>
+          </TouchableOpacity>
+
           <View style={styles.secondaryRow}>
             <TouchableOpacity
               style={[styles.secondaryBtn, { backgroundColor: t.surface, borderColor: t.border }, shadow.sm]}
@@ -331,6 +375,12 @@ const styles = StyleSheet.create({
     shadowColor: palette.primary, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6,
   },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
+  exportBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: radius.lg, padding: 14, marginTop: space.sm, borderWidth: 1.5,
+  },
+  exportBtnText: { fontSize: 14, fontWeight: '700' },
 
   secondaryRow: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   secondaryBtn: {

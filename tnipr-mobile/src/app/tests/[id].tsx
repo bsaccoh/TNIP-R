@@ -9,6 +9,7 @@ import LeafletMap from '@/components/LeafletMap';
 import { getAnalysis, getSamples, getCompliance, Sample } from '@/api/drivetest';
 import { rsrpColor, rsrpLabel } from '@/utils/signalColor';
 import { useTheme, palette, shadow, radius, space } from '@/theme';
+import { exportReportAsPdf, ReportData } from '@/utils/exportReport';
 
 const TECH_COLORS: Record<string, string> = {
   '4G': palette.primary, '5G': palette.purple,
@@ -68,6 +69,7 @@ export default function TestDetailScreen() {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [compliance, setCompliance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +92,29 @@ export default function TestDetailScreen() {
   const meta = analysis?.meta;
   const stats = analysis?.stats;
   const techColor = TECH_COLORS[meta?.technology] || palette.primary;
+
+  const handleExport = async () => {
+    if (!analysis || exporting) return;
+    setExporting(true);
+    try {
+      const reportData: ReportData = {
+        meta: meta ?? {},
+        stats: stats ?? {},
+        compliance: {
+          status: compliance?.status,
+          checks_passed: compliance?.checks_passed,
+          checks_total: compliance?.checks_total,
+          checks: compliance?.checks ?? [],
+        },
+      };
+      await exportReportAsPdf(reportData);
+    } catch (e: any) {
+      const { Alert } = await import('react-native');
+      Alert.alert('Export failed', e?.message ?? 'Could not generate PDF.');
+    } finally {
+      setExporting(false);
+    }
+  };
   const mapCoords = samples
     .filter((s) => s.latitude && s.longitude)
     .map((s) => ({ latitude: Number(s.latitude), longitude: Number(s.longitude), color: rsrpColor(s.rsrp) }));
@@ -114,6 +139,11 @@ export default function TestDetailScreen() {
             <Text style={styles.headerSub}>{meta?.operator_name} · {meta?.test_date}</Text>
           </View>
         </View>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExport} disabled={exporting} activeOpacity={0.75}>
+          {exporting
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="share-outline" size={20} color="#fff" />}
+        </TouchableOpacity>
       </View>
 
       <TabBar active={tab} onSelect={setTab} t={t} />
@@ -290,6 +320,7 @@ const styles = StyleSheet.create({
 
   header: { paddingTop: 52, paddingBottom: space.lg, paddingHorizontal: space.lg, flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  exportBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
   headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   techBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
