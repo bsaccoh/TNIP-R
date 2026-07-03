@@ -14,15 +14,21 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { get, post, put, del } from '../api/client';
 import { KpiCard, Loading, EmptyState } from '../components/ui';
 import { exportCsv } from '../utils/csv';
+import { useAuth } from '../auth/AuthContext';
 
 const STATUSES = ['ACTIVE', 'DEGRADED', 'DOWN', 'PLANNED'];
 
 export default function Inventory() {
+  const { user } = useAuth();
+  const isRegulator = ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'].includes(user?.role);
+
   const [stats, setStats] = useState(null);
   const [sites, setSites] = useState(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  const [ops, setOps] = useState([]);
+  const [operatorId, setOperatorId] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -33,7 +39,11 @@ export default function Inventory() {
 
   const loadSites = () => {
     const t = setTimeout(() => {
-      get('/inventory/sites', { page: page + 1, limit: 10, search: search || undefined })
+      get('/inventory/sites', {
+        page: page + 1, limit: 10,
+        search: search || undefined,
+        operatorId: operatorId || undefined,
+      })
         .then((r) => { setSites(r.data); setTotal(r.meta?.total || 0); })
         .catch(() => setSites([]));
     }, 250);
@@ -41,7 +51,11 @@ export default function Inventory() {
   };
 
   useEffect(() => { loadStats(); }, []);
-  useEffect(loadSites, [page, search]);
+  useEffect(() => {
+    if (!isRegulator) return;
+    get('/operators').then((r) => setOps(r.data.data ?? r.data ?? [])).catch(() => {});
+  }, [isRegulator]);
+  useEffect(loadSites, [page, search, operatorId]);
 
   const handleImported = () => {
     loadStats();
@@ -100,6 +114,18 @@ export default function Inventory() {
           <Stack direction="row" spacing={1} mb={2} alignItems="center">
             <TextField size="small" label="Search site code / name" value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }} sx={{ flex: 1 }} />
+            {isRegulator && (
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Operator</InputLabel>
+                <Select label="Operator" value={operatorId}
+                  onChange={(e) => { setOperatorId(e.target.value); setPage(0); }}>
+                  <MenuItem value="">All operators</MenuItem>
+                  {ops.map((o) => (
+                    <MenuItem key={o.operator_id} value={o.operator_id}>{o.operator_name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <Button size="small" startIcon={<RefreshIcon />} onClick={reload}>Refresh</Button>
           </Stack>
 

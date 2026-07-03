@@ -79,7 +79,7 @@ function calcFine({ baseAmount, perDayAmount, days, maxAmount }) {
 /* ── Penalty Rules ───────────────────────────────────────────────────────── */
 export async function listRules({ active } = {}) {
   await ensureTables();
-  const where = active !== undefined ? `WHERE is_active = ${active ? 1 : 0}` : '';
+  const where = active !== undefined ? `WHERE pr.is_active = ${active ? 1 : 0}` : '';
   return query(`SELECT pr.*, u.full_name AS created_by_name
                   FROM penalty_rules pr
                   LEFT JOIN users u ON u.user_id = pr.created_by

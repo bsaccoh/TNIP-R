@@ -18,6 +18,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import RouteIcon from '@mui/icons-material/Route';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/AuthContext';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
@@ -108,11 +109,13 @@ function CampaignDialog({ open, onClose, operators, onSaved, initial }) {
   const empty = {
     name: '', description: '', operatorId: '', objective: '',
     targetArea: '', technology: '', plannedStart: '', plannedEnd: '',
-    plannedTests: '', notes: '',
+    plannedTests: '', notes: '', technicians: [],
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [techName, setTechName] = useState('');
+  const [techRole, setTechRole] = useState('');
 
   useEffect(() => {
     if (open) setForm(initial ? {
@@ -126,12 +129,22 @@ function CampaignDialog({ open, onClose, operators, onSaved, initial }) {
       plannedEnd: initial.planned_end   ? initial.planned_end.slice(0, 10)   : '',
       plannedTests: initial.planned_tests || '',
       notes: initial.notes || '',
+      technicians: Array.isArray(initial.technicians) ? initial.technicians : [],
     } : empty);
+    setTechName(''); setTechRole('');
     setErr('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const addTech = () => {
+    const name = techName.trim();
+    if (!name) return;
+    setForm((f) => ({ ...f, technicians: [...f.technicians, { name, role: techRole.trim() || 'Field Technician' }] }));
+    setTechName(''); setTechRole('');
+  };
+  const removeTech = (i) => setForm((f) => ({ ...f, technicians: f.technicians.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
     if (!form.name.trim()) { setErr('Campaign name is required'); return; }
@@ -205,6 +218,29 @@ function CampaignDialog({ open, onClose, operators, onSaved, initial }) {
           <Grid item xs={12} md={4}>
             <TextField fullWidth type="number" label="Planned Tests" inputProps={{ min: 0 }}
               value={form.plannedTests} onChange={set('plannedTests')} />
+          </Grid>
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Assigned Technicians</Typography>
+            <Stack direction="row" spacing={1} sx={{ mb: form.technicians.length ? 1.5 : 0 }}>
+              <TextField size="small" label="Technician name" value={techName}
+                onChange={(e) => setTechName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTech(); } }}
+                sx={{ flex: 1 }} />
+              <TextField size="small" label="Role (optional)" value={techRole}
+                onChange={(e) => setTechRole(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTech(); } }}
+                sx={{ width: 180 }} placeholder="Field Technician" />
+              <Button variant="outlined" onClick={addTech} startIcon={<AddIcon />}
+                disabled={!techName.trim()}>Add</Button>
+            </Stack>
+            {form.technicians.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {form.technicians.map((t, i) => (
+                  <Chip key={i} label={t.role ? `${t.name} · ${t.role}` : t.name}
+                    onDelete={() => removeTech(i)} size="small" />
+                ))}
+              </Stack>
+            )}
           </Grid>
           <Grid item xs={12}>
             <TextField fullWidth multiline rows={2} label="Description"
@@ -590,6 +626,16 @@ function CampaignDrawer({
                 <Typography variant="body2">{campaign.description}</Typography>
               </Box>
             )}
+            {Array.isArray(campaign.technicians) && campaign.technicians.length > 0 && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">Assigned Technicians</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                  {campaign.technicians.map((t, i) => (
+                    <Chip key={i} size="small" label={t.role ? `${t.name} · ${t.role}` : t.name} />
+                  ))}
+                </Stack>
+              </Box>
+            )}
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <Typography variant="caption" color="text.secondary">Planned Start</Typography>
@@ -756,27 +802,17 @@ export default function DriveTestCampaigns() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#1b5e20,#388e3c)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <CampaignIcon />
-              <Typography variant="h5" fontWeight={700}>Drive Test Campaigns</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Manage field campaigns — assign technicians, plan routes, link test results, and track compliance evidence.
-            </Typography>
-          </Box>
-          {isRegulator && (
-            <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setShowCreate(true)}
-              sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
-              New Campaign
-            </Button>
-          )}
-        </Stack>
-      </Box>
+      <PageHeader
+        icon={<CampaignIcon />}
+        title="Drive Test Campaigns"
+        subtitle="Manage field campaigns — assign technicians, plan routes, link test results, and track compliance evidence."
+        actions={isRegulator && (
+          <Button variant="contained" size="small" startIcon={<AddIcon />}
+            onClick={() => setShowCreate(true)}>
+            New Campaign
+          </Button>
+        )}
+      />
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

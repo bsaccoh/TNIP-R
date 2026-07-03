@@ -19,6 +19,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import WarningAmberIcon  from '@mui/icons-material/WarningAmber';
 import { useAuth }       from '../auth/AuthContext';
 import { api }           from '../api/client';
+import PageHeader        from '../components/PageHeader';
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const STATUS_META = {
@@ -488,13 +489,12 @@ export default function Penalties() {
 
   useEffect(() => {
     if (!isRegulator) return;
-    Promise.all([
-      api.get('/penalties/rules'),
-      api.get('/operators'),
-    ]).then(([r, o]) => {
-      setRules(r.data.data ?? []);
-      setOps(o.data.data?.operators ?? o.data.data ?? []);
-    }).catch(() => {});
+    api.get('/operators')
+      .then((o) => setOps(o.data.data?.operators ?? o.data.data ?? []))
+      .catch(() => {});
+    api.get('/penalties/rules')
+      .then((r) => setRules(r.data.data ?? []))
+      .catch(() => {});
   }, [isRegulator]);
 
   async function autoGenerate() {
@@ -520,40 +520,28 @@ export default function Penalties() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#b71c1c,#d32f2f)', borderRadius: 3, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <AccountBalanceIcon sx={{ fontSize: 32 }} />
-            <Box>
-              <Typography variant="h5" fontWeight={700}>Penalty & Fine Engine</Typography>
-              <Typography variant="body2" sx={{ opacity: .8 }}>
-                Assess, issue, and track regulatory fines — link to enforcement cases and license obligation breaches
-              </Typography>
-            </Box>
-          </Stack>
-          {isRegulator && (
-            <Stack direction="row" gap={1}>
-              <Button size="small" variant="outlined"
-                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-                startIcon={<SettingsIcon />} onClick={() => setRules2(true)}>
-                Rules
-              </Button>
-              <Button size="small" variant="outlined"
-                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-                startIcon={autoRunning ? <CircularProgress size={14} color="inherit" /> : <AutoFixHighIcon />}
-                onClick={autoGenerate} disabled={autoRunning}>
-                Auto-Generate
-              </Button>
-              <Button size="small" variant="contained" startIcon={<AddIcon />}
-                sx={{ bgcolor: 'rgba(255,255,255,.15)', '&:hover': { bgcolor: 'rgba(255,255,255,.25)' } }}
-                onClick={() => setCreate(true)}>
-                New Assessment
-              </Button>
-            </Stack>
-          )}
-        </Stack>
-      </Box>
+      <PageHeader
+        icon={<AccountBalanceIcon />}
+        title="Penalty & Fine Engine"
+        subtitle="Assess, issue, and track regulatory fines — link to enforcement cases and license obligation breaches"
+        actions={isRegulator && (
+          <>
+            <Button size="small" variant="outlined"
+              startIcon={<SettingsIcon />} onClick={() => setRules2(true)}>
+              Rules
+            </Button>
+            <Button size="small" variant="outlined"
+              startIcon={autoRunning ? <CircularProgress size={14} color="inherit" /> : <AutoFixHighIcon />}
+              onClick={autoGenerate} disabled={autoRunning}>
+              Auto-Generate
+            </Button>
+            <Button size="small" variant="contained" startIcon={<AddIcon />}
+              onClick={() => setCreate(true)}>
+              New Assessment
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stat Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
