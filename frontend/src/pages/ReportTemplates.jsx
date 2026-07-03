@@ -15,6 +15,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 
 /* ── Icon map ────────────────────────────────────────────────────────────── */
 const ICONS = {
@@ -335,15 +336,16 @@ function PreviewPanel({ template, onClose, operators }) {
     <Drawer anchor="right" open onClose={onClose}
       PaperProps={{ sx: { width: { xs: '100%', md: 560 }, display: 'flex', flexDirection: 'column' } }}>
       {/* Header */}
-      <Box sx={{ background: `linear-gradient(135deg,${catColor},${catColor}cc)`, p: 2.5, color: '#fff', flexShrink: 0 }}>
+      <Box sx={{ p: 2.5, flexShrink: 0, borderBottom: 1, borderColor: 'divider',
+                 borderLeft: `3px solid ${catColor}` }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Box>
-            <Typography variant="caption" sx={{ opacity: 0.8, letterSpacing: 1 }}>{template.category.toUpperCase()}</Typography>
-            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>{template.title}</Typography>
+            <Typography variant="overline" color="text.secondary">{template.category}</Typography>
+            <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{template.title}</Typography>
           </Box>
-          <IconButton size="small" onClick={onClose} sx={{ color: '#fff' }}><CloseIcon /></IconButton>
+          <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
         </Stack>
-        <Typography variant="caption" sx={{ opacity: 0.85, mt: 1, display: 'block' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
           {template.description}
         </Typography>
       </Box>
@@ -710,16 +712,11 @@ export default function ReportTemplates() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#212121,#424242)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-          <ArticleIcon />
-          <Typography variant="h5" fontWeight={700}>Regulatory Report Templates</Typography>
-        </Stack>
-        <Typography variant="body2" sx={{ opacity: 0.85 }}>
-          Pre-built ITU / ECOWAS / NATCOM report formats · configure date range · print or export to PDF
-        </Typography>
-      </Box>
+      <PageHeader
+        icon={<ArticleIcon />}
+        title="Regulatory Report Templates"
+        subtitle="Pre-built ITU / ECOWAS / NATCOM report formats · configure date range · print or export to PDF"
+      />
 
       {/* Category filter */}
       <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap">

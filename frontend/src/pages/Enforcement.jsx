@@ -23,6 +23,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import InfoIcon from '@mui/icons-material/Info';
 import PersonIcon from '@mui/icons-material/Person';
 import { get, post, put } from '../api/client';
+import PageHeader from '../components/PageHeader';
 import { Loading, EmptyState } from '../components/ui';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
@@ -216,40 +217,24 @@ export default function Enforcement() {
 
   return (
     <Box>
-      {/* ── Header ── */}
-      <Box sx={{
-        background: 'linear-gradient(135deg, #b71c1c 0%, #c62828 50%, #d32f2f 100%)',
-        borderRadius: 3, p: 3, mb: 3, position: 'relative', overflow: 'hidden',
-      }}>
-        <Box sx={{ position: 'absolute', top: -20, right: -20, width: 160, height: 160,
-          borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <GavelIcon sx={{ fontSize: 40, color: '#fff' }} />
-            <Box>
-              <Typography variant="h5" fontWeight={800} color="#fff">Enforcement Cases</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>
-                Regulatory violation tracking and operator accountability
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" spacing={1.5}>
-            <Button variant="outlined"
+      <PageHeader
+        icon={<GavelIcon />}
+        title="Enforcement Cases"
+        subtitle="Regulatory violation tracking and operator accountability"
+        actions={
+          <>
+            <Button variant="outlined" size="small"
               startIcon={generating ? null : <AutoFixHighIcon />}
-              onClick={handleAutoGenerate} disabled={generating}
-              sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)',
-                '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              onClick={handleAutoGenerate} disabled={generating}>
               {generating ? 'Generating…' : 'Auto-generate from Violations'}
             </Button>
-            <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setCreating(true)}
-              sx={{ bgcolor: '#fff', color: '#c62828', fontWeight: 700,
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
+            <Button variant="contained" size="small" startIcon={<AddIcon />}
+              onClick={() => setCreating(true)}>
               New Case
             </Button>
-          </Stack>
-        </Stack>
-      </Box>
+          </>
+        }
+      />
 
       {/* ── Summary stats ── */}
       <Grid container spacing={2} mb={3}>

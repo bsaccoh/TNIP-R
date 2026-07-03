@@ -64,24 +64,41 @@ const MINI = 64;
 // roles: user must have one of these roles
 // permissions: user must have one of these permission keys (from role defaults or custom grants)
 // Omit both to allow any authenticated user.
+const ALL_STAFF = ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'];
+
+// section: renders a small non-clickable group label to separate blocks.
+// group: collapsible parent with children. Otherwise a flat link.
 const NAV = [
-  { to: '/',               label: 'My Overview',       icon: <HomeIcon />,                     roles: ['OPERATOR_USER'] },
-  { to: '/submission-cycles', label: 'My Submissions', icon: <AssignmentTurnedInIcon />,      roles: ['OPERATOR_USER'] },
-  { to: '/operator-disputes', label: 'My Disputes',   icon: <BalanceIcon />,                 roles: ['OPERATOR_USER'] },
-  { to: '/',               label: 'National Dashboard', icon: <DashboardIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST','DRIVE_TEST_USER'] },
-  { to: '/comparison', label: 'KPI Comparison', icon: <CompareArrowsIcon /> },
-  { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
+  // ── Operator-user workspace ──
+  { to: '/',                  label: 'My Overview',    icon: <HomeIcon />,               roles: ['OPERATOR_USER'] },
+  { to: '/submission-cycles', label: 'My Submissions', icon: <AssignmentTurnedInIcon />, roles: ['OPERATOR_USER'] },
+  { to: '/operator-disputes', label: 'My Disputes',    icon: <BalanceIcon />,            roles: ['OPERATOR_USER'] },
+
+  // ── Regulator workspace ──
+  { to: '/', label: 'National Dashboard', icon: <DashboardIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
+
+  { section: 'Performance' },
+  {
+    group: 'performance', label: 'KPI & Monitoring', icon: <AnalyticsIcon />,
+    children: [
+      { to: '/comparison', label: 'KPI Comparison', icon: <CompareArrowsIcon /> },
+      { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
+      { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
+      { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
+    ],
+  },
   {
     group: 'compliance', label: 'Compliance', icon: <VerifiedIcon />,
     children: [
+      { to: '/sla-dashboard', label: 'SLA Dashboard', icon: <FactCheckIcon2 />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/compliance', label: 'Compliance', icon: <VerifiedIcon /> },
-      { to: '/sla-dashboard', label: 'SLA Dashboard', icon: <FactCheckIcon2 />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
       { to: '/compliance-notices', label: 'Compliance Notices', icon: <GavelIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:read', 'compliance:write'] },
-      { to: '/enforcement',       label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-      { to: '/operator-disputes',  label: 'Disputes',            icon: <BalanceIcon />,              roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-      { to: '/submission-cycles', label: 'Submission Cycles',  icon: <AssignmentTurnedInIcon />,  roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-      { to: '/obligations',       label: 'License Obligations', icon: <FactCheckIcon />,           roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-      { to: '/penalties',         label: 'Penalties & Fines',   icon: <AccountBalanceIcon />,      roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/enforcement', label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/operator-disputes', label: 'Disputes', icon: <BalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/submission-cycles', label: 'Submission Cycles', icon: <AssignmentTurnedInIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/obligations', label: 'License Obligations', icon: <FactCheckIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/penalties', label: 'Penalties & Fines', icon: <AccountBalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
     ],
   },
   {
@@ -89,41 +106,51 @@ const NAV = [
     children: [
       { to: '/operators', label: 'Operators', icon: <BusinessIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:read', 'operators:write'] },
       { to: '/ranking', label: 'Operator Ranking', icon: <EmojiEventsIcon /> },
+      { to: '/consumer-qoe', label: 'Consumer QoE', icon: <SentimentVeryDissatisfiedIcon /> },
     ],
   },
-  { to: '/map', label: 'Coverage Map', icon: <MapIcon /> },
+
+  { section: 'Network' },
   {
-    group: 'network-data', label: 'Network & Data', icon: <CellTowerIcon />,
+    group: 'network', label: 'Network & Coverage', icon: <CellTowerIcon />,
     children: [
+      { to: '/map', label: 'Coverage Map', icon: <MapIcon /> },
       { to: '/inventory', label: 'Network Inventory', icon: <CellTowerIcon /> },
-      { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['kpi:read', 'kpi:write'] },
-    ],
-  },
-  {
-    group: 'data-mgmt', label: 'Data Management', icon: <UploadFileIcon />,
-    children: [
-      { to: '/ingestion', label: 'Data Ingestion', icon: <UploadFileIcon />, permissions: ['ingestion:write'], roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
-      { to: '/data-quality', label: 'Data Quality', icon: <VerifiedUserIcon /> },
-    ],
-  },
-  {
-    group: 'reports', label: 'Reports', icon: <AssessmentIcon />,
-    children: [
-      { to: '/reports', label: 'Reports', icon: <AssessmentIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['reports:read'] },
-      { to: '/report-templates', label: 'Report Templates', icon: <FeedIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['reports:read'] },
-      { to: '/scheduled-reports', label: 'Scheduled Reports', icon: <ScheduleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['reports:read'] },
+      { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ALL_STAFF, permissions: ['kpi:read', 'kpi:write'] },
     ],
   },
   {
     group: 'drive-test', label: 'Drive Testing', icon: <RouteIcon />,
     children: [
       { to: '/drive-test', label: 'Drive Tests', icon: <RouteIcon /> },
-      { to: '/drive-test-campaigns', label: 'DT Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
-      { to: '/field', label: 'Field App (Mobile)', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
+      { to: '/drive-test-campaigns', label: 'Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
+      { to: '/field', label: 'Field App', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
       { to: '/drive-test-analytics', label: 'DT Analytics', icon: <QueryStatsIcon /> },
       { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
     ],
   },
+
+  { section: 'Data & Reports' },
+  {
+    group: 'reports', label: 'Reports', icon: <AssessmentIcon />,
+    children: [
+      { to: '/reports', label: 'Reports', icon: <AssessmentIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
+      { to: '/report-templates', label: 'Report Templates', icon: <FeedIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
+      { to: '/scheduled-reports', label: 'Scheduled Reports', icon: <ScheduleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['reports:read'] },
+    ],
+  },
+  {
+    group: 'data', label: 'Data & Integration', icon: <UploadFileIcon />,
+    children: [
+      { to: '/ingestion', label: 'Data Ingestion', icon: <UploadFileIcon />, permissions: ['ingestion:write'], roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/data-quality', label: 'Data Quality', icon: <VerifiedUserIcon /> },
+      { to: '/api-gateway', label: 'API Gateway', icon: <ApiIcon /> },
+    ],
+  },
+  { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon />, permissions: ['ai:read'] },
+
+  { section: 'Administration' },
   {
     group: 'kpi-config', label: 'KPI Configuration', icon: <FunctionsIcon />,
     children: [
@@ -131,17 +158,10 @@ const NAV = [
       { to: '/thresholds', label: 'KPI Thresholds', icon: <TuneIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:write'] },
     ],
   },
-  { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
-  { to: '/consumer-qoe', label: 'Consumer QoE', icon: <SentimentVeryDissatisfiedIcon /> },
-  { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-  { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST'], permissions: ['compliance:read'] },
-  { to: '/api-gateway', label: 'API Gateway', icon: <ApiIcon /> },
-  { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
-  { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon />, permissions: ['ai:read'] },
-  { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
   {
-    group: 'settings', label: 'Settings', icon: <SettingsIcon />,
+    group: 'admin', label: 'System', icon: <SettingsIcon />,
     children: [
+      { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
       { to: '/settings', label: 'General Settings', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
       { to: '/licenses', label: 'License Management', icon: <CardMembershipIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
       { to: '/audit-log', label: 'Audit Log', icon: <HistoryIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
@@ -154,6 +174,30 @@ function canAccess(item, user) {
   const hasRole = item.roles?.includes(user?.role) ?? false;
   const hasPerm = item.permissions?.some((p) => user?.permissions?.includes(p)) ?? false;
   return hasRole || hasPerm;
+}
+
+// Build the role-filtered nav, dropping section headers that have no visible
+// entry before the next section (avoids orphan labels for limited roles).
+function buildVisibleNav(user) {
+  const visible = [];
+  for (const item of NAV) {
+    if (item.section) { visible.push(item); continue; }
+    if (item.group) {
+      const children = item.children.filter((c) => canAccess(c, user));
+      if (children.length) visible.push({ ...item, children });
+      continue;
+    }
+    if (canAccess(item, user)) visible.push(item);
+  }
+  return visible.filter((item, i) => {
+    if (!item.section) return true;
+    const rest = visible.slice(i + 1);
+    const nextItem = rest.findIndex((x) => !x.section);
+    const nextSection = rest.findIndex((x) => x.section);
+    if (nextItem === -1) return false;
+    if (nextSection !== -1 && nextSection < nextItem) return false;
+    return true;
+  });
 }
 
 function LiveClock() {
@@ -208,14 +252,17 @@ export default function Layout() {
       </Toolbar>
       <Divider />
       <List sx={{ flex: 1, py: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV.flatMap((item) => {
-          if (item.group) {
-            const visibleChildren = item.children.filter((c) => canAccess(c, user));
-            if (!visibleChildren.length) return [];
-            return [{ ...item, children: visibleChildren }];
+        {buildVisibleNav(user).map((item) => {
+          if (item.section) {
+            return expanded ? (
+              <Typography key={`sec-${item.section}`} variant="overline"
+                sx={{ display: 'block', px: 3, pt: 2, pb: 0.5, color: 'text.disabled' }}>
+                {item.section}
+              </Typography>
+            ) : (
+              <Divider key={`sec-${item.section}`} sx={{ my: 1, mx: 1.5 }} />
+            );
           }
-          return canAccess(item, user) ? [item] : [];
-        }).map((item) => {
           if (item.group) {
             const isGroupActive = item.children.some((c) => location.pathname === c.to);
             const isOpen = groupOpen[item.group] ?? isGroupActive;
@@ -363,7 +410,6 @@ export default function Layout() {
               {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
             </IconButton>
           </Tooltip>
-          {!isMobile && <Chip label="National Regulator" color="primary" variant="outlined" size="small" />}
         </Toolbar>
       </AppBar>
 

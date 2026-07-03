@@ -19,6 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CodeIcon from '@mui/icons-material/Code';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/AuthContext';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
@@ -484,33 +485,23 @@ export default function ApiGateway() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#0d47a1,#1565c0)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <VpnKeyIcon />
-              <Typography variant="h5" fontWeight={700}>API Gateway</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Manage API keys for programmatic data push — operators can push PM counters, KPIs, and alarms directly into TNIP-R.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Button variant="outlined" startIcon={<CodeIcon />}
-              onClick={() => setShowGuide(true)}
-              sx={{ borderColor: 'rgba(255,255,255,0.5)', color: '#fff',
-                    '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+      <PageHeader
+        icon={<VpnKeyIcon />}
+        title="API Gateway"
+        subtitle="Manage API keys for programmatic data push — operators push PM counters, KPIs, and alarms directly into TNIP-R."
+        actions={
+          <>
+            <Button variant="outlined" size="small" startIcon={<CodeIcon />}
+              onClick={() => setShowGuide(true)}>
               Integration Guide
             </Button>
-            <Button variant="contained" startIcon={<AddIcon />}
-              onClick={() => setShowCreate(true)}
-              sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
+            <Button variant="contained" size="small" startIcon={<AddIcon />}
+              onClick={() => setShowCreate(true)}>
               New Key
             </Button>
-          </Stack>
-        </Stack>
-      </Box>
+          </>
+        }
+      />
 
       {/* Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

@@ -11,6 +11,7 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 
 /* ── RAG palette ─────────────────────────────────────────────────────────── */
 const RAG = {
@@ -192,17 +193,17 @@ function DetailDrawer({ operatorId, days, onClose }) {
       {!loading && detail && (
         <>
           {/* Header */}
-          <Box sx={{ background: `linear-gradient(135deg,${meta.color},${meta.color}bb)`, p: 3, color: '#fff' }}>
+          <Box sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Stack direction="row" spacing={2} alignItems="center">
                 <ScoreRing score={detail.score} rag={detail.rag} size={64} />
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>{detail.operatorName}</Typography>
-                  <Chip size="small" label={meta.label}
-                    sx={{ bgcolor: 'rgba(255,255,255,0.22)', color: '#fff', fontSize: '0.68rem', mt: 0.5 }} />
+                  <Typography variant="h6">{detail.operatorName}</Typography>
+                  <Chip size="small" label={meta.label} color={meta.chip}
+                    sx={{ fontSize: '0.68rem', mt: 0.5 }} />
                 </Box>
               </Stack>
-              <IconButton size="small" onClick={onClose} sx={{ color: '#fff' }}><CloseIcon /></IconButton>
+              <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
             </Stack>
           </Box>
 
@@ -377,28 +378,19 @@ export default function SlaDashboard() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#004d40,#00695c)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <FactCheckIcon />
-              <Typography variant="h5" fontWeight={700}>SLA Dashboard</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Per-operator accountability · license obligations · KPI compliance · penalty exposure
-            </Typography>
-          </Box>
-          <FormControl size="small" sx={{ minWidth: 140, bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1,
-                                          '& .MuiInputLabel-root, & .MuiSelect-select, & .MuiSvgIcon-root': { color: '#fff' },
-                                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' } }}>
+      <PageHeader
+        icon={<FactCheckIcon />}
+        title="SLA Dashboard"
+        subtitle="Per-operator accountability · license obligations · KPI compliance · penalty exposure"
+        actions={
+          <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>KPI Window</InputLabel>
             <Select value={days} label="KPI Window" onChange={(e) => setDays(e.target.value)}>
               {[30, 60, 90].map((d) => <MenuItem key={d} value={d}>Last {d} days</MenuItem>)}
             </Select>
           </FormControl>
-        </Stack>
-      </Box>
+        }
+      />
 
       {/* Summary */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

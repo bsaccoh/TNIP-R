@@ -89,14 +89,9 @@ export default function OperatorPortal() {
     <Box>
       {/* ── Operator hero banner ── */}
       <Box sx={{
-        background: 'linear-gradient(135deg, #1a237e 0%, #283593 50%, #1565c0 100%)',
-        borderRadius: 3, p: 3, mb: 3, position: 'relative', overflow: 'hidden',
+        bgcolor: '#1e293b',
+        borderRadius: 2, p: 3, mb: 3,
       }}>
-        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 200, height: 200,
-          borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)' }} />
-        <Box sx={{ position: 'absolute', bottom: -40, right: 100, width: 120, height: 120,
-          borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.03)' }} />
-
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
           {/* Compliance ring */}
           <ComplianceRing rate={compliance.rate} />

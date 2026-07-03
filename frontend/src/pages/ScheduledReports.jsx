@@ -22,6 +22,7 @@ import SendIcon          from '@mui/icons-material/Send';
 import WifiIcon          from '@mui/icons-material/Wifi';
 import AssessmentIcon    from '@mui/icons-material/Assessment';
 import { get, post, put, del } from '../api/client';
+import PageHeader from '../components/PageHeader';
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const FREQ_COLOR = { DAILY: 'info', WEEKLY: 'primary', MONTHLY: 'secondary' };
@@ -340,34 +341,25 @@ export default function ScheduledReports() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#0d47a1,#1976d2)', borderRadius: 3, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <ScheduleIcon sx={{ fontSize: 32 }} />
-            <Box>
-              <Typography variant="h5" fontWeight={700}>Report Auto-Distribution</Typography>
-              <Typography variant="body2" sx={{ opacity: .8 }}>
-                Schedule regulatory reports for automatic generation and email delivery to recipients
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" gap={1}>
+      <PageHeader
+        icon={<ScheduleIcon />}
+        title="Report Auto-Distribution"
+        subtitle="Schedule regulatory reports for automatic generation and email delivery to recipients"
+        actions={
+          <>
             <Tooltip title="Test SMTP email configuration">
               <Button size="small" variant="outlined"
-                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
                 startIcon={<WifiIcon />} onClick={() => setSmtp(true)}>
                 SMTP Test
               </Button>
             </Tooltip>
             <Button size="small" variant="contained" startIcon={<AddIcon />}
-              sx={{ bgcolor: 'rgba(255,255,255,.15)', '&:hover': { bgcolor: 'rgba(255,255,255,.25)' } }}
               onClick={() => { setEditRow(null); setDialog(true); }}>
               New Schedule
             </Button>
-          </Stack>
-        </Stack>
-      </Box>
+          </>
+        }
+      />
 
       {/* Stat Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

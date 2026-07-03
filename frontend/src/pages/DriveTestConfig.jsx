@@ -15,6 +15,8 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import RadarIcon from '@mui/icons-material/Radar';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { get, put } from '../api/client';
+import TuneIcon from '@mui/icons-material/Tune';
+import PageHeader from '../components/PageHeader';
 import { Loading } from '../components/ui';
 
 /* ── per-metric visual config ───────────────────────────────────────────── */
@@ -232,45 +234,30 @@ export default function DriveTestConfig() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
 
       {/* ── page header ── */}
-      <Box sx={{
-        borderRadius: 3, p: 3,
-        background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #1565c0 100%)',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* decorative circles */}
-        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 150, height: 150, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
-        <Box sx={{ position: 'absolute', bottom: -20, right: 80, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Box>
-            <Typography variant="h5" fontWeight={800} color="#fff">Drive Test Configuration</Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5 }}>
-              Set compliance thresholds and analysis parameters for drive test evaluation
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={saving ? null : saved ? <CheckCircleIcon /> : <SaveIcon />}
-            onClick={handleSave}
-            disabled={saving}
-            sx={{
-              bgcolor: saved ? '#2e9e5b' : '#fff',
-              color: saved ? '#fff' : '#1565c0',
-              fontWeight: 700,
-              px: 3,
-              '&:hover': { bgcolor: saved ? '#2e9e5b' : alpha('#fff', 0.9) },
-              '&.Mui-disabled': { bgcolor: alpha('#fff', 0.4), color: alpha('#1565c0', 0.5) },
-            }}
-          >
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Configuration'}
-          </Button>
-        </Stack>
-
+      <Box>
+        <PageHeader
+          icon={<TuneIcon />}
+          title="Drive Test Configuration"
+          subtitle="Set compliance thresholds and analysis parameters for drive test evaluation"
+          actions={
+            <Button
+              variant="contained"
+              size="small"
+              color={saved ? 'success' : 'primary'}
+              startIcon={saving ? null : saved ? <CheckCircleIcon /> : <SaveIcon />}
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Configuration'}
+            </Button>
+          }
+        />
         {saved && (
-          <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mt: 2, bgcolor: alpha('#2e9e5b', 0.15), color: '#a5d6a7', border: '1px solid #2e9e5b' }}>
+          <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 2 }}>
             Configuration saved successfully.
           </Alert>
         )}
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       </Box>
 
       {/* ── section label ── */}

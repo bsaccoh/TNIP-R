@@ -16,6 +16,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import PageHeader from '../components/PageHeader';
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const TECH_COLOR = { '2G': '#546e7a', '3G': '#1565c0', '4G': '#2e7d32', '5G': '#6a1b9a', Other: '#795548' };
@@ -510,36 +511,25 @@ export default function SpectrumManagement() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#1a237e,#0d47a1)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <SignalCellularAltIcon />
-              <Typography variant="h5" fontWeight={700}>Spectrum Management</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Frequency assignments · band visualizer · interference tracking · expiry watchlist
-            </Typography>
-          </Box>
-          {canWrite && (
-            <Stack direction="row" spacing={1}>
-              <Button size="small" variant="outlined"
-                sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)' }}
-                startIcon={<WarningAmberIcon />}
-                onClick={() => setIntfDlg(true)}>
-                File Interference
-              </Button>
-              <Button size="small" variant="contained"
-                sx={{ bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}
-                startIcon={<AddIcon />}
-                onClick={() => { setEditAssign(null); setAssignDlg(true); }}>
-                New Assignment
-              </Button>
-            </Stack>
-          )}
-        </Stack>
-      </Box>
+      <PageHeader
+        icon={<SignalCellularAltIcon />}
+        title="Spectrum Management"
+        subtitle="Frequency assignments · band visualizer · interference tracking · expiry watchlist"
+        actions={canWrite && (
+          <>
+            <Button size="small" variant="outlined" color="inherit"
+              startIcon={<WarningAmberIcon />}
+              onClick={() => setIntfDlg(true)}>
+              File Interference
+            </Button>
+            <Button size="small" variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => { setEditAssign(null); setAssignDlg(true); }}>
+              New Assignment
+            </Button>
+          </>
+        )}
+      />
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

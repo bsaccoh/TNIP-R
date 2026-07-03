@@ -10,6 +10,7 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 
 /* ── Meta ────────────────────────────────────────────────────────────────── */
 const RISK_META = {
@@ -165,16 +166,11 @@ export default function PredictiveAnalytics() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#263238,#37474f)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-          <TrendingUpIcon />
-          <Typography variant="h5" fontWeight={700}>Predictive Analytics</Typography>
-        </Stack>
-        <Typography variant="body2" sx={{ opacity: 0.85 }}>
-          KPI trend forecasting · operator health scores · obligation risk watchlist
-        </Typography>
-      </Box>
+      <PageHeader
+        icon={<TrendingUpIcon />}
+        title="Predictive Analytics"
+        subtitle="KPI trend forecasting · operator health scores · obligation risk watchlist"
+      />
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

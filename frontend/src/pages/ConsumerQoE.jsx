@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../api/client';
+import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/AuthContext';
 
 /* ── Meta ────────────────────────────────────────────────────────────────── */
@@ -266,29 +267,20 @@ export default function ConsumerQoE() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#4a148c,#7b1fa2)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <SentimentVeryDissatisfiedIcon />
-              <Typography variant="h5" fontWeight={700}>Consumer QoE Dashboard</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Crowdsourced network quality complaints from consumers across Sierra Leone
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Button variant="outlined" startIcon={<OpenInNewIcon />}
-              href="/report" target="_blank"
-              sx={{ borderColor: 'rgba(255,255,255,0.5)', color: '#fff',
-                    '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+      <PageHeader
+        icon={<SentimentVeryDissatisfiedIcon />}
+        title="Consumer QoE Dashboard"
+        subtitle="Crowdsourced network quality complaints from consumers across Sierra Leone"
+        actions={
+          <>
+            <Button variant="outlined" size="small" startIcon={<OpenInNewIcon />}
+              href="/report" target="_blank">
               Public Form
             </Button>
-            <IconButton onClick={load} sx={{ color: '#fff' }}><RefreshIcon /></IconButton>
-          </Stack>
-        </Stack>
-      </Box>
+            <IconButton onClick={load}><RefreshIcon /></IconButton>
+          </>
+        }
+      />
 
       {/* Summary stat cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

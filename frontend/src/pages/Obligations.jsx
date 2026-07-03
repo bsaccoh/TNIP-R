@@ -20,6 +20,7 @@ import AutorenewIcon        from '@mui/icons-material/Autorenew';
 import AssignmentIcon       from '@mui/icons-material/Assignment';
 import { useAuth }          from '../auth/AuthContext';
 import { api }              from '../api/client';
+import PageHeader           from '../components/PageHeader';
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const STATUS_META = {
@@ -483,39 +484,26 @@ export default function Obligations() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#4a148c,#7b1fa2)', borderRadius: 3, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <GavelIcon sx={{ fontSize: 32 }} />
-            <Box>
-              <Typography variant="h5" fontWeight={700}>License Obligation Tracker</Typography>
-              <Typography variant="body2" sx={{ opacity: .8 }}>
-                Track SLA commitments, coverage targets, rollout milestones and breach status per operator
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" gap={1}>
-            {isRegulator && (
-              <>
-                <Tooltip title="Auto-detect breaches & at-risk based on today's date">
-                  <Button size="small" variant="outlined"
-                    sx={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-                    startIcon={autoUpdating ? <CircularProgress size={14} color="inherit" /> : <AutorenewIcon />}
-                    onClick={autoUpdate} disabled={autoUpdating}>
-                    Auto-Update
-                  </Button>
-                </Tooltip>
-                <Button size="small" variant="contained" startIcon={<AddIcon />}
-                  sx={{ bgcolor: 'rgba(255,255,255,.15)', '&:hover': { bgcolor: 'rgba(255,255,255,.25)' } }}
-                  onClick={() => setCreate(true)}>
-                  New Obligation
-                </Button>
-              </>
-            )}
-          </Stack>
-        </Stack>
-      </Box>
+      <PageHeader
+        icon={<GavelIcon />}
+        title="License Obligation Tracker"
+        subtitle="Track SLA commitments, coverage targets, rollout milestones and breach status per operator"
+        actions={isRegulator && (
+          <>
+            <Tooltip title="Auto-detect breaches & at-risk based on today's date">
+              <Button size="small" variant="outlined"
+                startIcon={autoUpdating ? <CircularProgress size={14} color="inherit" /> : <AutorenewIcon />}
+                onClick={autoUpdate} disabled={autoUpdating}>
+                Auto-Update
+              </Button>
+            </Tooltip>
+            <Button size="small" variant="contained" startIcon={<AddIcon />}
+              onClick={() => setCreate(true)}>
+              New Obligation
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stat Cards */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 2, mb: 3 }}>

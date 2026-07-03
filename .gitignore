@@ -26,6 +26,9 @@ tnipr-mobile/.expo/
 tnipr-mobile/android/
 tnipr-mobile/ios/
 
+# Generated artifacts (presentations, exports)
+*.pptx
+
 # OS
 .DS_Store
 Thumbs.db

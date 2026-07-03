@@ -15,6 +15,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SpeedIcon from '@mui/icons-material/Speed';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import PageHeader from '../components/PageHeader';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 const SEVERITY_META = {
@@ -196,26 +197,19 @@ export default function RealtimeMonitor() {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#1a237e,#283593)', borderRadius: 2, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-              <WifiTetheringIcon />
-              <Typography variant="h5" fontWeight={700}>Real-Time Network Monitor</Typography>
-            </Stack>
-            <Typography variant="body2" sx={{ opacity: 0.85 }}>
-              Live alarm board · operator push activity · latest KPI snapshots
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
+      <PageHeader
+        icon={<WifiTetheringIcon />}
+        title="Real-Time Network Monitor"
+        subtitle="Live alarm board · operator push activity · latest KPI snapshots"
+        actions={
+          <>
             {lastRefresh && <LiveBadge lastRefresh={lastRefresh} />}
-            <IconButton onClick={load} sx={{ color: '#fff' }} disabled={loading}>
+            <IconButton onClick={load} disabled={loading}>
               <RefreshIcon />
             </IconButton>
-          </Stack>
-        </Stack>
-      </Box>
+          </>
+        }
+      />
 
       {loading && !lastRefresh && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>

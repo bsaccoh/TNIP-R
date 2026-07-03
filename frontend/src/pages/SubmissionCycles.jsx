@@ -20,6 +20,7 @@ import AssignmentIcon     from '@mui/icons-material/Assignment';
 import LockIcon           from '@mui/icons-material/Lock';
 import { useAuth }        from '../auth/AuthContext';
 import { api }            from '../api/client';
+import PageHeader         from '../components/PageHeader';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 const STATUS_META = {
@@ -420,28 +421,16 @@ export default function SubmissionCycles() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg,#0d47a1,#1976d2)', borderRadius: 3, p: 3, mb: 3, color: '#fff' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Box>
-            <Stack direction="row" alignItems="center" gap={1.5}>
-              <CalendarMonthIcon sx={{ fontSize: 32 }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700}>Regulatory Submission Cycles</Typography>
-                <Typography variant="body2" sx={{ opacity: .8 }}>
-                  Manage periodic PM data submission rounds — create periods, track operator compliance, approve or reject submissions
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-          {isRegulator && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreate(true)}
-              sx={{ bgcolor: 'rgba(255,255,255,.15)', '&:hover': { bgcolor: 'rgba(255,255,255,.25)' }, flexShrink: 0 }}>
-              New Period
-            </Button>
-          )}
-        </Stack>
-      </Box>
+      <PageHeader
+        icon={<CalendarMonthIcon />}
+        title="Regulatory Submission Cycles"
+        subtitle="Manage periodic PM data submission rounds — create periods, track operator compliance, approve or reject submissions"
+        actions={isRegulator && (
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreate(true)}>
+            New Period
+          </Button>
+        )}
+      />
 
       {/* Stat Cards */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 2, mb: 3 }}>

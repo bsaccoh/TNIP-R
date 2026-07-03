@@ -17,6 +17,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { get, post, put } from '../api/client';
+import PageHeader from '../components/PageHeader';
 import { Loading, EmptyState } from '../components/ui';
 
 const STATUS_META = {
@@ -130,34 +131,18 @@ export default function Disputes() {
 
   return (
     <Box>
-      {/* ── Header ── */}
-      <Box sx={{
-        background: 'linear-gradient(135deg, #4a148c 0%, #6a1b9a 50%, #7b1fa2 100%)',
-        borderRadius: 3, p: 3, mb: 3, position: 'relative', overflow: 'hidden',
-      }}>
-        <Box sx={{ position: 'absolute', top: -20, right: -20, width: 150, height: 150,
-          borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <BalanceIcon sx={{ fontSize: 40, color: '#fff' }} />
-            <Box>
-              <Typography variant="h5" fontWeight={800} color="#fff">
-                {isOperator ? 'My Disputes' : 'Dispute Management'}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>
-                {isOperator
-                  ? 'Challenge compliance findings and enforcement cases'
-                  : 'Review and adjudicate operator dispute submissions'}
-              </Typography>
-            </Box>
-          </Stack>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}
-            sx={{ bgcolor: '#fff', color: '#6a1b9a', fontWeight: 700,
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}>
+      <PageHeader
+        icon={<BalanceIcon />}
+        title={isOperator ? 'My Disputes' : 'Dispute Management'}
+        subtitle={isOperator
+          ? 'Challenge compliance findings and enforcement cases'
+          : 'Review and adjudicate operator dispute submissions'}
+        actions={
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
             {isOperator ? 'Raise a Dispute' : 'Create Dispute'}
           </Button>
-        </Stack>
-      </Box>
+        }
+      />
 
       {/* ── Stats ── */}
       <Grid container spacing={2} mb={3}>
