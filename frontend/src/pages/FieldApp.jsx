@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box, Typography, Paper, Stack, Chip, Divider,
   CircularProgress, Alert, Button, IconButton,
@@ -6,7 +6,6 @@ import {
   BottomNavigation, BottomNavigationAction, Snackbar,
   List, ListItem, ListItemText, ListItemSecondaryAction,
   Slide, Dialog, DialogTitle, DialogContent, DialogActions,
-  LinearProgress,
 } from '@mui/material';
 import RouteIcon from '@mui/icons-material/Route';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
@@ -15,9 +14,10 @@ import MyLocationIcon from '@mui/icons-material/MyLocation';
 import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt';
 import StopCircleIcon from '@mui/icons-material/StopCircle';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../api/client';
@@ -36,48 +36,82 @@ function loadSession() {
 }
 function saveSession(s) { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); }
 
-/* ── Signal quality colours ──────────────────────────────────────────────── */
+/* ── Signal quality helpers ──────────────────────────────────────────────── */
+const NEUTRAL = '#94a3b8';
 function rsrpColor(v) {
-  if (v == null) return '#757575';
-  if (v >= -85)  return '#2e7d32';
-  if (v >= -100) return '#f57f17';
-  return '#c62828';
+  if (v == null) return NEUTRAL;
+  if (v >= -85)  return '#16a34a';
+  if (v >= -100) return '#d97706';
+  if (v >= -110) return '#ea580c';
+  return '#dc2626';
 }
 function rsrpLabel(v) {
-  if (v == null) return '—';
+  if (v == null) return 'No signal';
   if (v >= -85)  return 'Excellent';
-  if (v >= -100) return 'Good';
+  if (v >= -95)  return 'Good';
   if (v >= -110) return 'Fair';
   return 'Poor';
 }
+function pctOf(v, min, max) {
+  if (v == null) return 0;
+  return Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
+}
 
-/* ── GPS accuracy badge ──────────────────────────────────────────────────── */
-function AccuracyBadge({ accuracy }) {
-  const color = accuracy == null ? '#757575' : accuracy <= 10 ? '#2e7d32' : accuracy <= 30 ? '#f57f17' : '#c62828';
+/* ── Circular signal gauge (SVG) ─────────────────────────────────────────── */
+function SignalGauge({ rsrp, size = 168 }) {
+  const pct   = pctOf(rsrp, -140, -44);
+  const color = rsrpColor(rsrp);
+  const r     = size / 2 - 12;
+  const circ  = 2 * Math.PI * r;
+  const dash  = (pct / 100) * circ;
+
   return (
-    <Chip size="small" icon={<MyLocationIcon sx={{ fontSize: 14 }} />}
-      label={accuracy != null ? `±${accuracy.toFixed(0)}m` : 'No GPS'}
-      sx={{ bgcolor: color, color: '#fff', fontSize: '0.68rem', height: 22 }} />
+    <Box sx={{ position: 'relative', width: size, height: size, mx: 'auto' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke="rgba(148,163,184,0.20)" strokeWidth={11} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={color} strokeWidth={11} strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`}
+          style={{ transition: 'stroke-dasharray 0.5s ease, stroke 0.3s ease' }} />
+      </svg>
+      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                 alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1 }}>RSRP</Typography>
+        <Typography variant="h4" fontWeight={700} sx={{ color, lineHeight: 1.05 }}>
+          {rsrp != null ? rsrp : '—'}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">dBm</Typography>
+        <Chip size="small" label={rsrpLabel(rsrp)}
+          sx={{ mt: 0.5, bgcolor: `${color}22`, color, fontWeight: 600, fontSize: '0.68rem' }} />
+      </Box>
+    </Box>
   );
 }
 
-/* ── Signal meter bar ────────────────────────────────────────────────────── */
-function SignalBar({ label, value, min, max, unit = '' }) {
-  const pct = value != null ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)) : 0;
-  const color = pct > 60 ? '#2e7d32' : pct > 30 ? '#f57f17' : '#c62828';
+/* ── Metric tile ─────────────────────────────────────────────────────────── */
+function MetricTile({ label, value, unit, color }) {
   return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.3 }}>
-        <Typography variant="caption" color="text.secondary">{label}</Typography>
-        <Typography variant="caption" fontWeight={700}
-          sx={{ color: value != null ? color : 'text.disabled' }}>
-          {value != null ? `${value}${unit}` : '—'}
-        </Typography>
-      </Stack>
-      <LinearProgress variant="determinate" value={pct}
-        sx={{ height: 5, borderRadius: 3, bgcolor: 'action.hover',
-              '& .MuiLinearProgress-bar': { bgcolor: color } }} />
-    </Box>
+    <Paper variant="outlined" sx={{ p: 1.25, textAlign: 'center', borderRadius: 2 }}>
+      <Typography variant="h6" fontWeight={700} sx={{ color: color || 'text.primary', lineHeight: 1.1 }}>
+        {value ?? '—'}
+        {value != null && unit && (
+          <Typography component="span" variant="caption" color="text.secondary"> {unit}</Typography>
+        )}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+    </Paper>
+  );
+}
+
+/* ── GPS accuracy badge ──────────────────────────────────────────────────── */
+function AccuracyBadge({ accuracy, dark }) {
+  const color = accuracy == null ? NEUTRAL : accuracy <= 10 ? '#16a34a' : accuracy <= 30 ? '#d97706' : '#dc2626';
+  return (
+    <Chip size="small" icon={<MyLocationIcon sx={{ fontSize: 14, color: `${color} !important` }} />}
+      label={accuracy != null ? `±${accuracy.toFixed(0)}m` : 'No GPS'}
+      sx={{ bgcolor: dark ? 'rgba(255,255,255,0.10)' : `${color}1f`, color: dark ? '#e2e8f0' : color,
+            fontWeight: 600, fontSize: '0.68rem', height: 24 }} />
   );
 }
 
@@ -117,7 +151,7 @@ function ReadingDialog({ open, onClose, onCapture, gps }) {
         </Stack>
         {gps && (
           <Typography variant="caption" color="text.secondary">
-            {gps.latitude.toFixed(5)}, {gps.longitude.toFixed(5)} · <AccuracyBadge accuracy={gps.accuracy} />
+            {gps.latitude.toFixed(5)}, {gps.longitude.toFixed(5)} · ±{gps.accuracy?.toFixed(0)}m
           </Typography>
         )}
       </DialogTitle>
@@ -188,9 +222,9 @@ function EndDialog({ open, onClose, onEnd, readingCount, offlineCount }) {
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>End Session</DialogTitle>
       <DialogContent>
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          {readingCount} reading{readingCount !== 1 ? 's' : ''} captured.
-          {offlineCount > 0 && ` (${offlineCount} pending upload)`}
+        <Typography variant="body2" sx={{ mb: 1.5 }}>
+          {readingCount} reading{readingCount !== 1 ? 's' : ''} captured
+          {offlineCount > 0 ? ` · ${offlineCount} pending upload` : ''}.
         </Typography>
         <TextField fullWidth size="small" multiline rows={2} label="Session notes (optional)"
           value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -198,7 +232,7 @@ function EndDialog({ open, onClose, onEnd, readingCount, offlineCount }) {
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" color="error" onClick={submit} disabled={ending}
-          startIcon={ending ? <CircularProgress size={16} /> : <StopCircleIcon />}>
+          startIcon={ending ? <CircularProgress size={16} color="inherit" /> : <StopCircleIcon />}>
           End & Upload
         </Button>
       </DialogActions>
@@ -222,14 +256,12 @@ function CampaignsTab({ onStart, activeSession }) {
     api.get('/operators').then((r) => setOperators((r.data.data || []).filter((o) => o.status === 'ACTIVE'))).catch(() => {});
   }, []);
 
-  const openStart = (camp) => { setSelCamp(camp); setStartDlg(true); };
-
   const doStart = async () => {
     setStarting(true);
     try {
       await onStart({
         campaignId:  selCamp?.campaign_id,
-        operatorId:  selCamp?.operator_id,
+        operatorId:  selCamp?.operator_id || form.operatorId,
         technology:  form.technology,
         routeType:   form.routeType,
         deviceModel: form.deviceModel,
@@ -240,61 +272,70 @@ function CampaignsTab({ onStart, activeSession }) {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
-        My Assigned Campaigns
-      </Typography>
+      <Typography variant="overline" color="text.secondary">Assigned to you</Typography>
 
-      {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>}
+      {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}><CircularProgress /></Box>}
 
       {!loading && campaigns.length === 0 && (
-        <Alert severity="info">No active campaigns assigned to you.</Alert>
+        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderRadius: 2, mt: 1 }}>
+          <RouteIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+          <Typography variant="body2" color="text.secondary">No campaigns assigned.</Typography>
+          <Typography variant="caption" color="text.disabled">Start an ad-hoc test below.</Typography>
+        </Paper>
       )}
 
-      <Stack spacing={1.5}>
-        {campaigns.map((c) => (
-          <Paper key={c.campaign_id} elevation={2} sx={{ p: 2, borderLeft: '4px solid #1565c0' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box sx={{ flex: 1, mr: 1 }}>
-                <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>
-                  {c.campaign_ref}
+      <Stack spacing={1.5} sx={{ mt: 1 }}>
+        {campaigns.map((c) => {
+          const live = c.status === 'IN_PROGRESS';
+          return (
+            <Paper key={c.campaign_id} variant="outlined"
+              sx={{ p: 2, borderRadius: 2, borderLeft: `3px solid ${live ? '#16a34a' : '#d97706'}` }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box sx={{ flex: 1, mr: 1, minWidth: 0 }}>
+                  <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>
+                    {c.campaign_ref}
+                  </Typography>
+                  <Typography variant="body1" fontWeight={600} noWrap>{c.campaign_name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{c.operator_name}</Typography>
+                </Box>
+                <Chip size="small" label={c.status.replace('_', ' ')}
+                  color={live ? 'success' : 'warning'} sx={{ fontSize: '0.62rem' }} />
+              </Stack>
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} alignItems="center">
+                <Typography variant="caption" color="text.secondary">
+                  {c.planned_end ? `Due ${new Date(c.planned_end).toLocaleDateString()}` : 'No deadline'}
+                  {c.linked_tests != null ? ` · ${c.linked_tests} tests` : ''}
                 </Typography>
-                <Typography variant="body2" fontWeight={700}>{c.campaign_name}</Typography>
-                <Typography variant="caption" color="text.secondary">{c.operator_name}</Typography>
-              </Box>
-              <Chip size="small" label={c.status}
-                color={c.status === 'IN_PROGRESS' ? 'success' : 'warning'}
-                sx={{ fontSize: '0.65rem' }} />
-            </Stack>
-            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {c.planned_end ? `Due ${new Date(c.planned_end).toLocaleDateString()}` : ''}
-              </Typography>
-              <Box sx={{ flex: 1 }} />
-              <Button size="small" variant="contained" startIcon={<RouteIcon />}
-                disabled={!!activeSession}
-                onClick={() => openStart(c)}>
-                Start Test
-              </Button>
-            </Stack>
-          </Paper>
-        ))}
+                <Box sx={{ flex: 1 }} />
+                <Button size="small" variant="contained" endIcon={<ChevronRightIcon />}
+                  disabled={!!activeSession}
+                  onClick={() => { setSelCamp(c); setStartDlg(true); }}>
+                  Start
+                </Button>
+              </Stack>
+            </Paper>
+          );
+        })}
       </Stack>
 
-      {/* Ad-hoc start (no campaign) */}
-      <Box sx={{ mt: 3 }}>
-        <Divider sx={{ mb: 2 }}><Typography variant="caption" color="text.disabled">or start ad-hoc</Typography></Divider>
-        <Button fullWidth variant="outlined" startIcon={<RouteIcon />}
-          disabled={!!activeSession}
-          onClick={() => { setSelCamp(null); setStartDlg(true); }}>
-          Start Ad-Hoc Drive Test
-        </Button>
-      </Box>
+      <Divider sx={{ my: 2.5 }}>
+        <Typography variant="caption" color="text.disabled">or</Typography>
+      </Divider>
+      <Button fullWidth variant="outlined" startIcon={<RouteIcon />}
+        disabled={!!activeSession}
+        onClick={() => { setSelCamp(null); setStartDlg(true); }}>
+        Start Ad-Hoc Drive Test
+      </Button>
+
+      {activeSession && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          A session is already running. End it before starting another.
+        </Alert>
+      )}
 
       {/* Start dialog */}
       <Dialog open={startDlg} onClose={() => setStartDlg(false)} fullWidth maxWidth="xs">
-        <DialogTitle>
-          {selCamp ? `Start Test — ${selCamp.campaign_name}` : 'Start Ad-Hoc Drive Test'}
-        </DialogTitle>
+        <DialogTitle>{selCamp ? selCamp.campaign_name : 'Ad-Hoc Drive Test'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {!selCamp && (
@@ -331,8 +372,8 @@ function CampaignsTab({ onStart, activeSession }) {
         <DialogActions>
           <Button onClick={() => setStartDlg(false)}>Cancel</Button>
           <Button variant="contained" onClick={doStart} disabled={starting}
-            startIcon={starting ? <CircularProgress size={16} /> : <RadioButtonCheckedIcon />}>
-            Start
+            startIcon={starting ? <CircularProgress size={16} color="inherit" /> : <RadioButtonCheckedIcon />}>
+            Start Recording
           </Button>
         </DialogActions>
       </Dialog>
@@ -348,156 +389,150 @@ function SessionTab({ session, readings, gps, gpsError, onCapture, onEnd }) {
 
   if (!session) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <RouteIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-        <Typography color="text.secondary">No active session.</Typography>
-        <Typography variant="caption" color="text.disabled">Go to Campaigns to start a drive test.</Typography>
+      <Box sx={{ p: 3, textAlign: 'center', mt: 6 }}>
+        <RadioButtonCheckedIcon sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
+        <Typography color="text.secondary" fontWeight={600}>No active session</Typography>
+        <Typography variant="caption" color="text.disabled">
+          Open the Campaigns tab to start a drive test.
+        </Typography>
       </Box>
     );
   }
 
   const lastReading = readings[readings.length - 1];
-  const avgRsrp = readings.length
-    ? readings.reduce((s, r) => s + (r.rsrp ?? 0), 0) / readings.filter((r) => r.rsrp != null).length
+  const withRsrp = readings.filter((r) => r.rsrp != null);
+  const avgRsrp = withRsrp.length
+    ? withRsrp.reduce((s, r) => s + r.rsrp, 0) / withRsrp.length
     : null;
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2, pb: 3 }}>
       {/* Session header */}
-      <Paper elevation={2} sx={{ p: 2, mb: 2, background: 'linear-gradient(135deg,#1b5e20,#2e7d32)', color: '#fff' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Stack direction="row" spacing={0.5} alignItems="center">
-              <RadioButtonCheckedIcon sx={{ fontSize: 14, animation: 'pulse 1s infinite' }} />
-              <Typography variant="caption" sx={{ opacity: 0.85 }}>RECORDING</Typography>
+      <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 2,
+             borderLeft: '3px solid #16a34a' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#16a34a',
+                         animation: 'fieldPulse 1.4s ease-in-out infinite',
+                         '@keyframes fieldPulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } } }} />
+              <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700, letterSpacing: 0.5 }}>
+                RECORDING
+              </Typography>
             </Stack>
-            <Typography variant="body2" fontWeight={700}>{session.testName}</Typography>
+            <Typography variant="body2" fontWeight={600} noWrap>{session.testName}</Typography>
           </Box>
-          <Chip size="small" label={`${readings.length} readings`}
-            sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.68rem' }} />
+          <Chip size="small" label={`${readings.length} readings`} variant="outlined" />
         </Stack>
       </Paper>
 
-      {/* GPS status */}
-      <Paper elevation={1} sx={{ p: 1.5, mb: 2 }}>
+      {/* GPS strip */}
+      <Paper variant="outlined" sx={{ p: 1.25, mb: 2, borderRadius: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <MyLocationIcon color={gps ? 'success' : 'disabled'} />
-          <Box sx={{ flex: 1 }}>
+          <MyLocationIcon sx={{ color: gps ? '#16a34a' : NEUTRAL, fontSize: 20 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             {gps
-              ? <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+              ? <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
                   {gps.latitude.toFixed(5)}, {gps.longitude.toFixed(5)}
                 </Typography>
-              : <Typography variant="body2" color="text.secondary">
-                  {gpsError || 'Acquiring GPS…'}
-                </Typography>}
+              : <Typography variant="body2" color="text.secondary">{gpsError || 'Acquiring GPS…'}</Typography>}
           </Box>
-          {gps && <AccuracyBadge accuracy={gps.accuracy} />}
+          <AccuracyBadge accuracy={gps?.accuracy} />
         </Stack>
       </Paper>
 
-      {/* Signal meters (from last reading) */}
-      {lastReading && (
-        <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-            Last Reading Signal Quality
-          </Typography>
-          <Stack spacing={1}>
-            <SignalBar label="RSRP" value={lastReading.rsrp} min={-140} max={-44} unit=" dBm" />
-            <SignalBar label="SINR" value={lastReading.sinr} min={-20}  max={30}  unit=" dB" />
-            <SignalBar label="DL"   value={lastReading.dl_throughput} min={0} max={150} unit=" Mbps" />
-          </Stack>
-          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap">
-            <Chip size="small" label={rsrpLabel(lastReading.rsrp)}
-              sx={{ bgcolor: rsrpColor(lastReading.rsrp), color: '#fff', fontSize: '0.65rem' }} />
-            {lastReading.band && (
-              <Chip size="small" label={lastReading.band} variant="outlined" sx={{ fontSize: '0.65rem' }} />
-            )}
-            {lastReading.event_type && lastReading.event_type !== 'NORMAL' && (
-              <Chip size="small" label={lastReading.event_type.replace(/_/g,' ')} color="warning" sx={{ fontSize: '0.65rem' }} />
-            )}
-          </Stack>
-        </Paper>
-      )}
+      {/* Signal gauge + metrics */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+        {lastReading ? (
+          <>
+            <SignalGauge rsrp={lastReading.rsrp} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, mt: 2 }}>
+              <MetricTile label="SINR" value={lastReading.sinr} unit="dB"
+                color={lastReading.sinr != null ? (lastReading.sinr >= 13 ? '#16a34a' : lastReading.sinr >= 0 ? '#d97706' : '#dc2626') : undefined} />
+              <MetricTile label="DL" value={lastReading.dl_throughput} unit="Mbps" />
+              <MetricTile label="UL" value={lastReading.ul_throughput} unit="Mbps" />
+            </Box>
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap justifyContent="center">
+              {lastReading.band && <Chip size="small" label={lastReading.band} variant="outlined" />}
+              {lastReading.event_type && lastReading.event_type !== 'NORMAL' && (
+                <Chip size="small" color="warning" label={lastReading.event_type.replace(/_/g, ' ')} />
+              )}
+            </Stack>
+          </>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            <SignalCellularAltIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">No readings yet</Typography>
+            <Typography variant="caption" color="text.disabled">
+              Tap “Capture Reading” to log signal at your location.
+            </Typography>
+          </Box>
+        )}
+      </Paper>
 
       {/* Session stats */}
-      <Paper elevation={1} sx={{ p: 1.5, mb: 2 }}>
-        <Grid3 items={[
-          { label: 'Readings', value: readings.length },
-          { label: 'Avg RSRP', value: avgRsrp != null ? `${avgRsrp.toFixed(1)} dBm` : '—' },
-          { label: 'Offline Buffer', value: offlineCount },
-        ]} />
-      </Paper>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, mb: 2 }}>
+        <MetricTile label="Readings" value={readings.length} />
+        <MetricTile label="Avg RSRP" value={avgRsrp != null ? avgRsrp.toFixed(1) : null} unit="dBm"
+          color={rsrpColor(avgRsrp)} />
+        <MetricTile label="Buffered" value={offlineCount}
+          color={offlineCount > 0 ? '#d97706' : undefined} />
+      </Box>
 
       {offlineCount > 0 && (
         <Alert severity="warning" icon={<WifiOffIcon />} sx={{ mb: 2 }}>
-          {offlineCount} reading{offlineCount > 1 ? 's' : ''} in offline buffer — will sync on End Session.
+          {offlineCount} reading{offlineCount > 1 ? 's' : ''} stored offline — will sync when you end the session.
         </Alert>
       )}
 
       {/* Actions */}
-      <Stack spacing={1.5}>
+      <Stack spacing={1.25}>
         <Button fullWidth variant="contained" size="large"
           startIcon={<AddCircleIcon />}
           onClick={() => setReadDlg(true)}
           sx={{ py: 1.5, fontSize: '1rem' }}>
           Capture Reading
         </Button>
-        <Button fullWidth variant="outlined" color="error" size="large"
+        <Button fullWidth variant="outlined" color="error"
           startIcon={<StopCircleIcon />}
           onClick={() => setEndDlg(true)}>
           End Session
         </Button>
       </Stack>
 
-      {/* Recent readings list */}
+      {/* Recent readings */}
       {readings.length > 0 && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Recent readings (latest first)
-          </Typography>
-          <List dense>
-            {[...readings].reverse().slice(0, 8).map((r, i) => (
-              <ListItem key={i} divider sx={{ py: 0.5 }}>
-                <ListItemText
-                  primary={
-                    <Stack direction="row" spacing={1}>
+        <Box sx={{ mt: 2.5 }}>
+          <Typography variant="overline" color="text.secondary">Recent readings</Typography>
+          <Paper variant="outlined" sx={{ borderRadius: 2, mt: 0.5 }}>
+            <List dense disablePadding>
+              {[...readings].reverse().slice(0, 8).map((r, i, arr) => (
+                <ListItem key={i} divider={i < arr.length - 1} sx={{ py: 0.75 }}>
+                  <ListItemText
+                    primary={
                       <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
                         {r.latitude?.toFixed(4)}, {r.longitude?.toFixed(4)}
                       </Typography>
-                    </Stack>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      RSRP {r.rsrp ?? '—'} dBm · SINR {r.sinr ?? '—'} dB · DL {r.dl_throughput ?? '—'} Mbps
-                    </Typography>
-                  }
-                />
-                <ListItemSecondaryAction>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: rsrpColor(r.rsrp) }} />
-                </ListItemSecondaryAction>
-              </ListItem>
-            ))}
-          </List>
+                    }
+                    secondary={
+                      <Typography variant="caption" color="text.secondary">
+                        RSRP {r.rsrp ?? '—'} · SINR {r.sinr ?? '—'} · DL {r.dl_throughput ?? '—'}
+                      </Typography>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: rsrpColor(r.rsrp) }} />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
         </Box>
       )}
 
       <ReadingDialog open={readDlg} onClose={() => setReadDlg(false)} onCapture={onCapture} gps={gps} />
       <EndDialog open={endDlg} onClose={() => setEndDlg(false)} onEnd={onEnd}
         readingCount={readings.length} offlineCount={offlineCount} />
-    </Box>
-  );
-}
-
-/* ── Mini 3-col grid helper ──────────────────────────────────────────────── */
-function Grid3({ items }) {
-  return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1 }}>
-      {items.map(({ label, value }) => (
-        <Box key={label} sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" fontWeight={700}>{value}</Typography>
-          <Typography variant="caption" color="text.secondary">{label}</Typography>
-        </Box>
-      ))}
     </Box>
   );
 }
@@ -511,40 +546,43 @@ function HistoryTab() {
     api.get('/field/history').then((r) => setRows(r.data.data || [])).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>;
-  if (!rows.length) return <Box sx={{ p: 2 }}><Alert severity="info">No sessions yet.</Alert></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}><CircularProgress /></Box>;
+  if (!rows.length) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center', mt: 5 }}>
+        <HistoryIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+        <Typography variant="body2" color="text.secondary">No sessions yet.</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <List sx={{ p: 1 }}>
-      {rows.map((r) => (
-        <Paper key={r.drive_test_id} elevation={1} sx={{ mb: 1.5 }}>
-          <ListItem alignItems="flex-start">
-            <ListItemText
-              primary={
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" fontWeight={600}>{r.test_name}</Typography>
-                  <Chip size="small" label={r.status}
-                    color={r.status === 'COMPLETED' ? 'success' : 'default'}
-                    sx={{ fontSize: '0.62rem', height: 18 }} />
-                </Stack>
-              }
-              secondary={
-                <Box sx={{ mt: 0.5 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {r.operator_name} · {r.technology} · {new Date(r.test_date).toLocaleDateString()}
-                  </Typography>
-                  <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }}>
-                    <Typography variant="caption">{r.sample_count} readings</Typography>
-                    {r.avg_rsrp && <Typography variant="caption">RSRP {Number(r.avg_rsrp).toFixed(1)} dBm</Typography>}
-                    {r.avg_dl   && <Typography variant="caption">DL {Number(r.avg_dl).toFixed(1)} Mbps</Typography>}
-                  </Stack>
-                </Box>
-              }
-            />
-          </ListItem>
-        </Paper>
-      ))}
-    </List>
+    <Box sx={{ p: 2 }}>
+      <Typography variant="overline" color="text.secondary">Your sessions</Typography>
+      <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+        {rows.map((r) => (
+          <Paper key={r.drive_test_id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Box sx={{ minWidth: 0, flex: 1, mr: 1 }}>
+                <Typography variant="body2" fontWeight={600} noWrap>{r.test_name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {r.operator_name} · {r.technology} · {new Date(r.test_date).toLocaleDateString()}
+                </Typography>
+              </Box>
+              <Chip size="small" label={r.status}
+                color={r.status === 'COMPLETED' ? 'success' : 'default'}
+                sx={{ fontSize: '0.62rem', height: 20 }} />
+            </Stack>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, mt: 1.5 }}>
+              <MetricTile label="Readings" value={r.sample_count} />
+              <MetricTile label="Avg RSRP" value={r.avg_rsrp != null ? Number(r.avg_rsrp).toFixed(1) : null}
+                unit="dBm" color={rsrpColor(r.avg_rsrp != null ? Number(r.avg_rsrp) : null)} />
+              <MetricTile label="Avg DL" value={r.avg_dl != null ? Number(r.avg_dl).toFixed(1) : null} unit="Mbps" />
+            </Box>
+          </Paper>
+        ))}
+      </Stack>
+    </Box>
   );
 }
 
@@ -587,10 +625,7 @@ export default function FieldApp() {
   };
 
   const captureReading = async (reading) => {
-    // Add to in-memory list immediately
     setReadings((prev) => [...prev, reading]);
-
-    // Try to upload; if offline buffer it
     try {
       await api.post(`/field/session/${activeSession.driveTestId}/reading`, reading);
     } catch {
@@ -604,7 +639,6 @@ export default function FieldApp() {
   };
 
   const endSession = async (notes) => {
-    // Flush offline buffer first
     const buf = loadBuffer();
     if (buf.length > 0) {
       try {
@@ -614,7 +648,6 @@ export default function FieldApp() {
         setToast('Warning: offline buffer could not be uploaded');
       }
     }
-
     const res = await api.post(`/field/session/${activeSession.driveTestId}/end`, { notes });
     const summary = res.data.data;
     saveSession(null);
@@ -624,26 +657,40 @@ export default function FieldApp() {
     setToast(`Session complete — ${summary.sampleCount} readings uploaded`);
   };
 
+  const TABS = [
+    { label: 'Campaigns', icon: <RouteIcon /> },
+    { label: 'Session', icon: activeSession
+        ? <RadioButtonCheckedIcon sx={{ color: '#16a34a' }} />
+        : <RadioButtonCheckedIcon /> },
+    { label: 'History', icon: <HistoryIcon /> },
+  ];
+
   return (
     <Box sx={{ height: '100dvh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
       {/* Top bar */}
-      <Box sx={{ background: 'linear-gradient(135deg,#0d1b2a,#1b2838)', px: 2, py: 1.5,
-                 display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-        <SignalCellularAltIcon sx={{ color: '#4fc3f7' }} />
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="body1" fontWeight={700} color="#fff">TNIP-R Field</Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+      <Box sx={{ bgcolor: '#0f172a', color: '#fff', px: 2, py: 1.25,
+                 display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0 }}>
+        <Box sx={{ display: 'grid', placeItems: 'center', width: 34, height: 34, borderRadius: 1.5,
+                   bgcolor: 'rgba(56,189,248,0.16)' }}>
+          <SignalCellularAltIcon sx={{ color: '#38bdf8', fontSize: 20 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body1" fontWeight={700} sx={{ lineHeight: 1.1 }}>TNIP-R Field</Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.6)' }} noWrap>
             {user.fullName || user.email}
           </Typography>
         </Box>
-        {activeSession && (
-          <Chip size="small" icon={<RadioButtonCheckedIcon sx={{ fontSize: 10, color: '#f44336 !important' }} />}
-            label="LIVE"
-            sx={{ bgcolor: 'rgba(244,67,54,0.2)', color: '#f44336', border: '1px solid #f44336',
-                  fontSize: '0.65rem', animation: 'pulse 1.5s ease-in-out infinite',
-                  '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.6 } } }} />
-        )}
-        {gps && <AccuracyBadge accuracy={gps.accuracy} />}
+        {activeSession
+          ? <Chip size="small" icon={<RadioButtonCheckedIcon sx={{ fontSize: 11, color: '#22c55e !important' }} />}
+              label="LIVE"
+              sx={{ bgcolor: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.4)',
+                    fontSize: '0.62rem', fontWeight: 700, height: 22,
+                    animation: 'fieldLive 1.6s ease-in-out infinite',
+                    '@keyframes fieldLive': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.55 } } }} />
+          : <Chip size="small" icon={<CloudDoneIcon sx={{ fontSize: 13, color: 'rgba(226,232,240,0.7) !important' }} />}
+              label="Idle" sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'rgba(226,232,240,0.8)',
+                                 fontSize: '0.62rem', height: 22 }} />}
+        <AccuracyBadge accuracy={gps?.accuracy} dark />
       </Box>
 
       {/* Content */}
@@ -663,16 +710,11 @@ export default function FieldApp() {
       </Box>
 
       {/* Bottom nav */}
-      <BottomNavigation value={tab} onChange={(_, v) => setTab(v)}
+      <BottomNavigation value={tab} onChange={(_, v) => setTab(v)} showLabels
         sx={{ borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
-        <BottomNavigationAction label="Campaigns" icon={<RouteIcon />} />
-        <BottomNavigationAction
-          label="Session"
-          icon={activeSession
-            ? <RadioButtonCheckedIcon sx={{ color: '#f44336' }} />
-            : <RadioButtonCheckedIcon />}
-        />
-        <BottomNavigationAction label="History" icon={<HistoryIcon />} />
+        {TABS.map((t) => (
+          <BottomNavigationAction key={t.label} label={t.label} icon={t.icon} />
+        ))}
       </BottomNavigation>
 
       <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)}
