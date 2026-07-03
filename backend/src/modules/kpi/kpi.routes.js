@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole, operatorScope } from '../../middleware/rbac.js';
+import { requireAccess, operatorScope } from '../../middleware/rbac.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ok, created } from '../../utils/http.js';
 import { ApiError } from '../../utils/ApiError.js';
@@ -11,19 +11,21 @@ import { getForecast } from './forecast.service.js';
 const router = Router();
 router.use(authenticate);
 
+const canWrite = requireAccess({ roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['kpi:write'] });
+
 router.get('/definitions', c.definitionsController);
 router.get('/comparison', c.comparisonController);
 router.get('/analytics', c.analyticsController);
 router.get('/timeseries', operatorScope, c.timeSeriesController);
-router.post('/validate', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), c.validateController);
-router.post('/recalculate', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), c.recalcController);
+router.post('/validate', canWrite, c.validateController);
+router.post('/recalculate', canWrite, c.recalcController);
 router.get('/forecast', asyncHandler(async (req, res) => {
   const { operatorId, kpiId, days } = req.query;
   if (!operatorId || !kpiId) throw ApiError.badRequest('operatorId and kpiId are required');
   return ok(res, await getForecast(Number(operatorId), Number(kpiId), days ? Number(days) : 30));
 }));
 
-router.post('/definitions', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.post('/definitions', canWrite,
   asyncHandler(async (req, res) => {
     const { kpi_key, name, unit, category, description } = req.body;
     if (!kpi_key || !name) throw ApiError.badRequest('kpi_key and name are required');
@@ -33,7 +35,7 @@ router.post('/definitions', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
 router.get('/definitions/:kpiId/formulas',
   asyncHandler(async (req, res) => ok(res, await service.getFormulasForKpi(Number(req.params.kpiId)))));
 
-router.post('/formulas', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.post('/formulas', canWrite,
   asyncHandler(async (req, res) => {
     const { kpi_id, expression, operator_id, technology_id, vendor_id } = req.body;
     if (!kpi_id || !expression) throw ApiError.badRequest('kpi_id and expression are required');

@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole, operatorScope } from '../../middleware/rbac.js';
+import { requireAccess, operatorScope } from '../../middleware/rbac.js';
 import { env } from '../../config/env.js';
 import * as c from './ingestion.controller.js';
 
 const router = Router();
 router.use(authenticate);
+
+const canIngest = requireAccess({
+  roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'OPERATOR_USER'],
+  permissions: ['ingestion:write'],
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -31,7 +36,7 @@ const upload = multer({
  */
 router.post(
   '/upload',
-  requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN', 'OPERATOR_USER'),
+  canIngest,
   operatorScope,
   upload.single('file'),
   c.uploadController
@@ -46,7 +51,7 @@ router.post(
  */
 router.post(
   '/batch',
-  requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN', 'OPERATOR_USER'),
+  canIngest,
   operatorScope,
   upload.single('file'),
   c.batchUploadController

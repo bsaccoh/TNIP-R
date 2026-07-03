@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole, operatorScope } from '../../middleware/rbac.js';
+import { requireAccess, operatorScope } from '../../middleware/rbac.js';
 import * as c from './operators.controller.js';
 
 const router = Router();
 router.use(authenticate);
+
+const canWrite = requireAccess({ roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:write'] });
 
 /**
  * @openapi
@@ -14,8 +16,8 @@ router.use(authenticate);
  */
 router.get('/', operatorScope, c.listController);
 router.get('/:operatorId', operatorScope, c.getController);
-router.post('/', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), c.createController);
-router.put('/:operatorId', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), c.updateController);
-router.delete('/:operatorId', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), c.deleteController);
+router.post('/', canWrite, c.createController);
+router.put('/:operatorId', canWrite, c.updateController);
+router.delete('/:operatorId', canWrite, c.deleteController);
 
 export default router;

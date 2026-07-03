@@ -34,32 +34,60 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import HistoryIcon from '@mui/icons-material/History';
 import RadarIcon from '@mui/icons-material/Radar';
 import GavelIcon from '@mui/icons-material/Gavel';
+import SecurityIcon from '@mui/icons-material/Security';
+import BalanceIcon from '@mui/icons-material/Balance';
+import HomeIcon from '@mui/icons-material/Home';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import ApiIcon from '@mui/icons-material/Api';
+import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
+import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CellWifiIcon from '@mui/icons-material/CellWifi';
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import FeedIcon from '@mui/icons-material/Feed';
+import FactCheckIcon2 from '@mui/icons-material/RuleFolder';
 import { useAuth } from '../auth/AuthContext';
 import { useColorMode } from '../theme/ColorMode';
 import NotificationsBell from './NotificationsBell';
 
 const FULL = 248;
 const MINI = 64;
+
+// roles: user must have one of these roles
+// permissions: user must have one of these permission keys (from role defaults or custom grants)
+// Omit both to allow any authenticated user.
 const NAV = [
-  { to: '/', label: 'National Dashboard', icon: <DashboardIcon /> },
+  { to: '/',               label: 'My Overview',       icon: <HomeIcon />,                     roles: ['OPERATOR_USER'] },
+  { to: '/submission-cycles', label: 'My Submissions', icon: <AssignmentTurnedInIcon />,      roles: ['OPERATOR_USER'] },
+  { to: '/operator-disputes', label: 'My Disputes',   icon: <BalanceIcon />,                 roles: ['OPERATOR_USER'] },
+  { to: '/',               label: 'National Dashboard', icon: <DashboardIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST','DRIVE_TEST_USER'] },
   { to: '/comparison', label: 'KPI Comparison', icon: <CompareArrowsIcon /> },
   { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
   {
     group: 'compliance', label: 'Compliance', icon: <VerifiedIcon />,
     children: [
       { to: '/compliance', label: 'Compliance', icon: <VerifiedIcon /> },
-      { to: '/compliance-notices', label: 'Compliance Notices', icon: <GavelIcon /> },
+      { to: '/sla-dashboard', label: 'SLA Dashboard', icon: <FactCheckIcon2 />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/compliance-notices', label: 'Compliance Notices', icon: <GavelIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:read', 'compliance:write'] },
+      { to: '/enforcement',       label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/operator-disputes',  label: 'Disputes',            icon: <BalanceIcon />,              roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/submission-cycles', label: 'Submission Cycles',  icon: <AssignmentTurnedInIcon />,  roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/obligations',       label: 'License Obligations', icon: <FactCheckIcon />,           roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+      { to: '/penalties',         label: 'Penalties & Fines',   icon: <AccountBalanceIcon />,      roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['compliance:read'] },
     ],
   },
   {
     group: 'operators', label: 'Operators', icon: <BusinessIcon />,
     children: [
-      { to: '/operators', label: 'Operators', icon: <BusinessIcon /> },
+      { to: '/operators', label: 'Operators', icon: <BusinessIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:read', 'operators:write'] },
       { to: '/ranking', label: 'Operator Ranking', icon: <EmojiEventsIcon /> },
     ],
   },
@@ -68,50 +96,65 @@ const NAV = [
     group: 'network-data', label: 'Network & Data', icon: <CellTowerIcon />,
     children: [
       { to: '/inventory', label: 'Network Inventory', icon: <CellTowerIcon /> },
-      { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon /> },
+      { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['kpi:read', 'kpi:write'] },
     ],
   },
   {
     group: 'data-mgmt', label: 'Data Management', icon: <UploadFileIcon />,
     children: [
-      { to: '/ingestion', label: 'Data Ingestion', icon: <UploadFileIcon /> },
+      { to: '/ingestion', label: 'Data Ingestion', icon: <UploadFileIcon />, permissions: ['ingestion:write'], roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
       { to: '/data-quality', label: 'Data Quality', icon: <VerifiedUserIcon /> },
     ],
   },
   {
     group: 'reports', label: 'Reports', icon: <AssessmentIcon />,
     children: [
-      { to: '/reports', label: 'Reports', icon: <AssessmentIcon /> },
-      { to: '/scheduled-reports', label: 'Scheduled Reports', icon: <ScheduleIcon /> },
+      { to: '/reports', label: 'Reports', icon: <AssessmentIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['reports:read'] },
+      { to: '/report-templates', label: 'Report Templates', icon: <FeedIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['reports:read'] },
+      { to: '/scheduled-reports', label: 'Scheduled Reports', icon: <ScheduleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['reports:read'] },
     ],
   },
   {
     group: 'drive-test', label: 'Drive Testing', icon: <RouteIcon />,
     children: [
       { to: '/drive-test', label: 'Drive Tests', icon: <RouteIcon /> },
+      { to: '/drive-test-campaigns', label: 'DT Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
+      { to: '/field', label: 'Field App (Mobile)', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
       { to: '/drive-test-analytics', label: 'DT Analytics', icon: <QueryStatsIcon /> },
-      { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon /> },
+      { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
     ],
   },
   {
-    group: 'kpi-config', label: 'KPI Configuration', icon: <FunctionsIcon />, adminOnly: true,
+    group: 'kpi-config', label: 'KPI Configuration', icon: <FunctionsIcon />,
     children: [
-      { to: '/kpis', label: 'KPI Builder', icon: <FunctionsIcon /> },
-      { to: '/thresholds', label: 'KPI Thresholds', icon: <TuneIcon /> },
+      { to: '/kpis', label: 'KPI Builder', icon: <FunctionsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['kpi:write'] },
+      { to: '/thresholds', label: 'KPI Thresholds', icon: <TuneIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:write'] },
     ],
   },
+  { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
+  { to: '/consumer-qoe', label: 'Consumer QoE', icon: <SentimentVeryDissatisfiedIcon /> },
+  { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+  { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST'], permissions: ['compliance:read'] },
+  { to: '/api-gateway', label: 'API Gateway', icon: <ApiIcon /> },
   { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
-  { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon /> },
-  { to: '/users', label: 'User Management', icon: <PeopleIcon />, adminOnly: true },
+  { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon />, permissions: ['ai:read'] },
+  { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
   {
-    group: 'settings', label: 'Settings', icon: <SettingsIcon />, adminOnly: true,
+    group: 'settings', label: 'Settings', icon: <SettingsIcon />,
     children: [
-      { to: '/settings', label: 'General Settings', icon: <SettingsIcon /> },
-      { to: '/licenses', label: 'License Management', icon: <CardMembershipIcon /> },
-      { to: '/audit-log', label: 'Audit Log', icon: <HistoryIcon /> },
+      { to: '/settings', label: 'General Settings', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/licenses', label: 'License Management', icon: <CardMembershipIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/audit-log', label: 'Audit Log', icon: <HistoryIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
     ],
   },
 ];
+
+function canAccess(item, user) {
+  if (!item.roles?.length && !item.permissions?.length) return true;
+  const hasRole = item.roles?.includes(user?.role) ?? false;
+  const hasPerm = item.permissions?.some((p) => user?.permissions?.includes(p)) ?? false;
+  return hasRole || hasPerm;
+}
 
 function LiveClock() {
   const [now, setNow] = useState(new Date());
@@ -165,7 +208,14 @@ export default function Layout() {
       </Toolbar>
       <Divider />
       <List sx={{ flex: 1, py: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV.filter((item) => !item.adminOnly || ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'].includes(user?.role)).map((item) => {
+        {NAV.flatMap((item) => {
+          if (item.group) {
+            const visibleChildren = item.children.filter((c) => canAccess(c, user));
+            if (!visibleChildren.length) return [];
+            return [{ ...item, children: visibleChildren }];
+          }
+          return canAccess(item, user) ? [item] : [];
+        }).map((item) => {
           if (item.group) {
             const isGroupActive = item.children.some((c) => location.pathname === c.to);
             const isOpen = groupOpen[item.group] ?? isGroupActive;

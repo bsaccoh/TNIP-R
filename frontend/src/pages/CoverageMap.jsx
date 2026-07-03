@@ -6,11 +6,15 @@ import {
   Box, Card, CardContent, Typography, ToggleButtonGroup, ToggleButton, Stack, Chip,
   FormControl, InputLabel, Select, MenuItem, TextField, InputAdornment, Divider,
   Switch, FormControlLabel, IconButton, Tooltip, LinearProgress, Badge,
+  Dialog, DialogTitle, DialogContent, Alert,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
 import CellTowerIcon from '@mui/icons-material/CellTower';
+import StreetviewIcon from '@mui/icons-material/Streetview';
+import CloseIcon from '@mui/icons-material/Close';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { get } from '../api/client';
 import { Loading, EmptyState } from '../components/ui';
 import { colorFor, OPERATOR_COLORS } from '../theme';
@@ -38,6 +42,22 @@ function HeatmapLayer({ points }) {
   return null;
 }
 
+// Captures map clicks when Street View pick-mode is active
+function StreetViewClickHandler({ active, onPick }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e) => onPick(e.latlng.lat, e.latlng.lng);
+    map.on('click', handler);
+    map.getContainer().style.cursor = 'crosshair';
+    return () => {
+      map.off('click', handler);
+      map.getContainer().style.cursor = '';
+    };
+  }, [map, active, onPick]);
+  return null;
+}
+
 export default function CoverageMap() {
   const [sites, setSites] = useState(null);
   const [cells, setCells] = useState(null);
@@ -52,6 +72,9 @@ export default function CoverageMap() {
   const [heatData, setHeatData] = useState(null);
   const [colorBy, setColorBy] = useState('operator');
   const [flyTarget, setFlyTarget] = useState(null);
+  const [streetViewMode, setStreetViewMode] = useState(false);
+  const [streetViewPos, setStreetViewPos] = useState(null);
+  const [streetViewOpen, setStreetViewOpen] = useState(false);
 
   const { mode } = useColorMode();
   const tileVariant = mode === 'dark' ? 'dark_all' : 'light_all';
@@ -144,6 +167,12 @@ export default function CoverageMap() {
     return colorFor(opName || '', item.operator_id - 1);
   }, [colorBy, operators]);
 
+  const handleStreetView = useCallback((lat, lng) => {
+    setStreetViewPos({ lat, lng });
+    setStreetViewOpen(true);
+    setStreetViewMode(false);
+  }, []);
+
   if (!sites) return <Loading height="calc(100vh - 130px)" />;
 
   const mapKey = `${tileVariant}-${colorBy}`;
@@ -212,6 +241,30 @@ export default function CoverageMap() {
             sx={{ mb: 1 }}
           />
           {showHeatmap && !heatData && <LinearProgress color="error" sx={{ mb: 1 }} />}
+
+          {/* Street View mode toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={streetViewMode}
+                onChange={(e) => setStreetViewMode(e.target.checked)}
+                color="info"
+              />
+            }
+            label={
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <StreetviewIcon sx={{ fontSize: 16, color: streetViewMode ? 'info.main' : 'text.secondary' }} />
+                <Typography variant="body2">Street View</Typography>
+              </Stack>
+            }
+            sx={{ mb: 0.5 }}
+          />
+          {streetViewMode && (
+            <Alert severity="info" sx={{ fontSize: 11, py: 0.5, mb: 1 }}>
+              Click any point on the map to open Street View.
+            </Alert>
+          )}
         </CardContent>
 
         <Divider />
@@ -362,7 +415,7 @@ export default function CoverageMap() {
                       pathOptions={{ color: c, fillColor: c, fillOpacity: 0.85, weight: 1.5 }}
                     >
                       <Popup>
-                        <div style={{ minWidth: 180 }}>
+                        <div style={{ minWidth: 190 }}>
                           <strong>{s.site_code}</strong><br />
                           <span style={{ fontSize: 12 }}>{s.site_name}</span><br />
                           <span style={{ fontSize: 11, color: '#888' }}>
@@ -372,12 +425,32 @@ export default function CoverageMap() {
                           <span style={{ fontSize: 11, color: '#666' }}>
                             {Number(s.latitude).toFixed(5)}, {Number(s.longitude).toFixed(5)}
                           </span>
+                          <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleStreetView(Number(s.latitude), Number(s.longitude))}
+                              style={{
+                                fontSize: 11, cursor: 'pointer', border: '1px solid #3da9fc',
+                                background: 'transparent', color: '#3da9fc', borderRadius: 4,
+                                padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 4,
+                              }}>
+                              📍 Street View
+                            </button>
+                            <a
+                              href={`https://www.google.com/maps?q=&layer=c&cbll=${Number(s.latitude)},${Number(s.longitude)}`}
+                              target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: 11, color: '#888', textDecoration: 'none', alignSelf: 'center' }}>
+                              ↗ Google Maps
+                            </a>
+                          </div>
                         </div>
                       </Popup>
                     </CircleMarker>
                   );
                 })}
               </MarkerClusterGroup>
+
+              {/* Street View click handler */}
+              <StreetViewClickHandler active={streetViewMode} onPick={handleStreetView} />
 
               {/* Heatmap layer */}
               {showHeatmap && heatPoints.length > 0 && <HeatmapLayer points={heatPoints} />}
@@ -422,8 +495,73 @@ export default function CoverageMap() {
               </IconButton>
             </Tooltip>
           )}
+
+          {/* Street View toggle button */}
+          <Tooltip title={streetViewMode ? 'Click map to open Street View — click to cancel' : 'Street View: click a point on the map'}>
+            <IconButton
+              size="small"
+              onClick={() => setStreetViewMode((m) => !m)}
+              sx={{
+                position: 'absolute', top: 120, right: 12, zIndex: 1000,
+                bgcolor: streetViewMode ? 'info.main' : 'background.paper',
+                color: streetViewMode ? '#fff' : 'text.primary',
+                boxShadow: 2,
+                '&:hover': { bgcolor: streetViewMode ? 'info.dark' : 'action.hover' },
+              }}>
+              <StreetviewIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </CardContent>
       </Card>
+      {/* Street View Dialog */}
+      <Dialog
+        open={streetViewOpen}
+        onClose={() => setStreetViewOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { height: 560 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 6 }}>
+          <StreetviewIcon color="info" />
+          Street View
+          {streetViewPos && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              {streetViewPos.lat.toFixed(5)}, {streetViewPos.lng.toFixed(5)}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
+            {streetViewPos && (
+              <Tooltip title="Open in Google Maps">
+                <IconButton
+                  size="small"
+                  component="a"
+                  href={`https://www.google.com/maps?q=&layer=c&cbll=${streetViewPos.lat},${streetViewPos.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <OpenInNewIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <IconButton size="small" onClick={() => setStreetViewOpen(false)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+          {streetViewPos && (
+            <iframe
+              key={`${streetViewPos.lat}-${streetViewPos.lng}`}
+              src={`https://maps.google.com/maps?q=&layer=c&cbll=${streetViewPos.lat},${streetViewPos.lng}&cbp=12,0,0,0,0&z=17&output=embed`}
+              width="100%"
+              height="100%"
+              style={{ border: 0, display: 'block' }}
+              allowFullScreen
+              title="Google Street View"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

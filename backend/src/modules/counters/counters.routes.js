@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/rbac.js';
+import { requireAccess } from '../../middleware/rbac.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ok, created, paginate, pageMeta } from '../../utils/http.js';
 import * as service from './counters.service.js';
 
 const router = Router();
 router.use(authenticate);
+
+const canWrite = requireAccess({ roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['kpi:write'] });
 
 router.get('/', asyncHandler(async (req, res) => {
   const { page, limit, offset } = paginate(req);
@@ -32,7 +34,7 @@ const importSchema = z.object({
   })).min(1),
 });
 
-router.post('/import', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.post('/import', canWrite,
   asyncHandler(async (req, res) => ok(res, await service.importMappings(importSchema.parse(req.body)))));
 
 const singleSchema = z.object({
@@ -45,13 +47,13 @@ const singleSchema = z.object({
   unit: z.string().optional(),
 });
 
-router.post('/', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.post('/', canWrite,
   asyncHandler(async (req, res) => created(res, await service.createCounter(singleSchema.parse(req.body)))));
 
-router.put('/:counterId', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.put('/:counterId', canWrite,
   asyncHandler(async (req, res) => ok(res, await service.updateCounter(Number(req.params.counterId), req.body))));
 
-router.delete('/:counterId', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
+router.delete('/:counterId', canWrite,
   asyncHandler(async (req, res) => ok(res, await service.deleteCounter(Number(req.params.counterId)))));
 
 export default router;

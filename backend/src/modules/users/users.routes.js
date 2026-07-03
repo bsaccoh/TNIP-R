@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/rbac.js';
+import { requireAccess } from '../../middleware/rbac.js';
 import { list, roles, create, update, reset, remove } from './users.controller.js';
 
 const router = Router();
 router.use(authenticate);
-router.use(requireRole('SYSTEM_ADMIN', 'REGULATOR_ADMIN'));
+
+// Any user who can reach User Management (by admin role OR a users:write grant).
+const canManageUsers = requireAccess({
+  roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'],
+  permissions: ['users:write'],
+});
+router.use(canManageUsers);
 
 router.get('/', list);
 router.get('/roles', roles);

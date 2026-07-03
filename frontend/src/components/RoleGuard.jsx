@@ -12,10 +12,11 @@ export default function RoleGuard({ roles, permissions: requiredPerms, children 
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
 
-  const hasRole = !roles || roles.includes(user.role);
-  const hasPerm =
-    requiredPerms?.length > 0 &&
-    requiredPerms.some((p) => user.permissions?.includes(p));
+  // No guard at all → allow any authenticated user
+  if (!roles?.length && !requiredPerms?.length) return children;
+
+  const hasRole = roles?.includes(user.role) ?? false;
+  const hasPerm = requiredPerms?.some((p) => user.permissions?.includes(p)) ?? false;
 
   if (!hasRole && !hasPerm) {
     return (

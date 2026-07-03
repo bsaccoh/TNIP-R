@@ -23,7 +23,9 @@ export async function listUsers() {
        LEFT JOIN operators o ON o.operator_id = u.operator_id
        LEFT JOIN user_permissions up ON up.user_id = u.user_id
       WHERE u.deleted_at IS NULL
-      GROUP BY u.user_id
+      GROUP BY u.user_id, u.email, u.full_name, u.is_active, u.mfa_enabled,
+               u.last_login_at, u.created_at, r.role_key, r.name,
+               o.operator_name
       ORDER BY u.created_at DESC`
   );
   return rows.map((u) => ({
@@ -33,8 +35,15 @@ export async function listUsers() {
 }
 
 export async function createUser({ email, password, fullName, roleKey, operatorId, permissions = [] }) {
-  const [existing] = await query('SELECT user_id FROM users WHERE email = :email AND deleted_at IS NULL', { email });
-  if (existing) throw ApiError.conflict('Email already in use');
+  // Check ALL rows (including soft-deleted) so we never hit a MySQL ER_DUP_ENTRY
+  // on the email UNIQUE constraint with a clear message.
+  const [existing] = await query('SELECT user_id, deleted_at FROM users WHERE email = :email', { email });
+  if (existing) {
+    const msg = existing.deleted_at
+      ? 'This email belongs to a previously deactivated account. Please use a different email.'
+      : 'Email already in use';
+    throw ApiError.conflict(msg);
+  }
 
   const [role] = await query('SELECT role_id FROM roles WHERE role_key = :rk', { rk: roleKey });
   if (!role) throw ApiError.badRequest('Invalid role');

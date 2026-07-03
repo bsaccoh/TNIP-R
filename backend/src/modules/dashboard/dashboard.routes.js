@@ -8,7 +8,7 @@ import { dataQuality } from './quality.service.js';
 const router = Router();
 router.use(authenticate);
 
-router.get('/national', asyncHandler(async (_req, res) => ok(res, await service.nationalExecutive())));
+router.get('/national', asyncHandler(async (req, res) => ok(res, await service.nationalExecutive({ from: req.query.from, to: req.query.to }))));
 router.get('/national-qos', asyncHandler(async (_req, res) => ok(res, await service.nationalQos())));
 router.get('/activity', asyncHandler(async (_req, res) => ok(res, await service.recentActivity())));
 router.get('/notifications', asyncHandler(async (_req, res) => ok(res, await service.notifications())));

@@ -21,6 +21,7 @@ build/
 **/build/
 
 # Expo / React Native
+.expo/
 tnipr-mobile/.expo/
 tnipr-mobile/android/
 tnipr-mobile/ios/
@@ -29,6 +30,7 @@ tnipr-mobile/ios/
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor / tooling (machine-specific)
 .vscode/
 .idea/
+**/.claude/

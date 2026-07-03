@@ -29,6 +29,22 @@ import DataQuality from './pages/DataQuality';
 import AuditLog from './pages/AuditLog';
 import Anomalies from './pages/Anomalies';
 import ComplianceNotices from './pages/ComplianceNotices';
+import Enforcement from './pages/Enforcement';
+import OperatorPortal from './pages/OperatorPortal';
+import Disputes from './pages/Disputes';
+import SubmissionCycles from './pages/SubmissionCycles';
+import Obligations from './pages/Obligations';
+import Penalties from './pages/Penalties';
+import DriveTestCampaigns from './pages/DriveTestCampaigns';
+import ApiGateway from './pages/ApiGateway';
+import RealtimeMonitor from './pages/RealtimeMonitor';
+import ConsumerQoE from './pages/ConsumerQoE';
+import ReportIssue from './pages/ReportIssue';
+import PredictiveAnalytics from './pages/PredictiveAnalytics';
+import SpectrumManagement from './pages/SpectrumManagement';
+import FieldApp from './pages/FieldApp';
+import ReportTemplates from './pages/ReportTemplates';
+import SlaDashboard from './pages/SlaDashboard';
 import RoleGuard from './components/RoleGuard';
 
 function Protected({ children }) {
@@ -43,15 +59,22 @@ function Protected({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
-export default function App() {
+function HomeRedirect() {
+  const { user } = useAuth();
+  return user?.role === 'OPERATOR_USER' ? <OperatorPortal /> : <Dashboard />;
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/report" element={<ReportIssue />} />
+      <Route path="/field" element={<FieldApp />} />
       <Route
         path="/"
         element={<Protected><Layout /></Protected>}
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<HomeRedirect />} />
         <Route path="comparison" element={<KpiComparison />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="ranking" element={<Ranking />} />
@@ -65,6 +88,7 @@ export default function App() {
         <Route path="analytics" element={<KpiAnalytics />} />
         <Route path="reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><Reports /></RoleGuard>} />
         <Route path="drive-test" element={<DriveTest />} />
+        <Route path="drive-test-campaigns" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST','DRIVE_TEST_USER']}><DriveTestCampaigns /></RoleGuard>} />
         <Route path="drive-test-analytics" element={<DriveTestAnalytics />} />
         <Route path="drive-test-config" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','DRIVE_TEST_USER']}><DriveTestConfig /></RoleGuard>} />
         <Route path="users" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['users:write']}><Users /></RoleGuard>} />
@@ -76,9 +100,26 @@ export default function App() {
         <Route path="anomalies" element={<Anomalies />} />
         <Route path="audit-log" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><AuditLog /></RoleGuard>} />
         <Route path="compliance-notices" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['compliance:read']}><ComplianceNotices /></RoleGuard>} />
+        <Route path="enforcement" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><Enforcement /></RoleGuard>} />
+        <Route path="operator-portal" element={<OperatorPortal />} />
+        <Route path="operator-disputes" element={<Disputes />} />
+        <Route path="submission-cycles" element={<SubmissionCycles />} />
+        <Route path="obligations" element={<Obligations />} />
+        <Route path="penalties" element={<Penalties />} />
+        <Route path="api-gateway" element={<ApiGateway />} />
+        <Route path="realtime" element={<RealtimeMonitor />} />
+        <Route path="consumer-qoe" element={<ConsumerQoE />} />
+        <Route path="predictive" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><PredictiveAnalytics /></RoleGuard>} />
+        <Route path="spectrum" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SpectrumManagement /></RoleGuard>} />
+        <Route path="report-templates" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><ReportTemplates /></RoleGuard>} />
+        <Route path="sla-dashboard" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SlaDashboard /></RoleGuard>} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+export default function App() {
+  return <AppRoutes />;
 }

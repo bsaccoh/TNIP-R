@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/rbac.js';
+import { requireRole, requireAccess } from '../../middleware/rbac.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ok } from '../../utils/http.js';
 import * as service from './ai.service.js';
 
 const router = Router();
 router.use(authenticate);
+
+const canUseAi = requireAccess({
+  roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'],
+  permissions: ['ai:read'],
+});
 
 /**
  * @openapi
@@ -16,7 +21,7 @@ router.use(authenticate);
  *     tags: [AI]
  *     summary: Ask the regulatory assistant a natural-language question
  */
-router.post('/ask', asyncHandler(async (req, res) => {
+router.post('/ask', canUseAi, asyncHandler(async (req, res) => {
   const question = z.string().min(1).parse(req.body.question);
   return ok(res, await service.ask(question));
 }));

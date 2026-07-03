@@ -2,10 +2,10 @@ import { createTheme } from '@mui/material/styles';
 
 // Shared brand + status tokens (mode-independent).
 export const OPERATOR_COLORS = {
-  Orange: '#ff7900',
-  Africell: '#00a3e0',
-  Qcell: '#7b2ff7',
-  SierraTel: '#1faa59',
+  Orange: '#ff7900',    // brand orange
+  Africell: '#8e24aa',  // brand purple (magenta-leaning, to stay distinct from Qcell)
+  Qcell: '#5b2d8e',     // brand purple (deep violet)
+  SierraTel: '#00a3e0', // brand blue
 };
 export const colorFor = (name, i = 0) =>
   OPERATOR_COLORS[name] || ['#3da9fc', '#ef6c00', '#2e9e5b', '#e0413b', '#9c27b0'][i % 5];

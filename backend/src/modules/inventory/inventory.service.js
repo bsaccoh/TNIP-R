@@ -345,3 +345,36 @@ export async function inventoryStats(operatorId) {
      ${op ? 'WHERE cl.operator_id = :op' : ''} GROUP BY t.tech_key`, p);
   return { sites: sites.c, cells: cells.c, byTech };
 }
+
+/**
+ * Network footprint broken down by operator and technology, for the
+ * inventory charts. Returns:
+ *   sites: [{ operator_id, operator_name, sites }]
+ *   cells: [{ operator_name, tech_key, cells }]   (one row per operator×tech)
+ * The frontend pivots `cells` into stacked-bar series.
+ */
+export async function inventoryBreakdown(operatorId) {
+  const opFilter = operatorId != null ? 'WHERE o.operator_id = :op' : '';
+  const p = operatorId != null ? { op: operatorId } : {};
+
+  const sites = await query(
+    `SELECT o.operator_id, o.operator_name,
+            COUNT(s.site_id) AS sites
+       FROM operators o
+       LEFT JOIN sites s ON s.operator_id = o.operator_id AND s.deleted_at IS NULL
+       ${opFilter}
+      GROUP BY o.operator_id, o.operator_name
+      ORDER BY sites DESC`, p);
+
+  const cells = await query(
+    `SELECT o.operator_name, t.tech_key,
+            COUNT(c.cell_id) AS cells
+       FROM operators o
+       JOIN cells c ON c.operator_id = o.operator_id AND c.deleted_at IS NULL
+       LEFT JOIN technologies t ON t.technology_id = c.technology_id
+       ${opFilter}
+      GROUP BY o.operator_name, t.tech_key
+      ORDER BY o.operator_name, t.tech_key`, p);
+
+  return { sites, cells };
+}

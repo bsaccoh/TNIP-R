@@ -1,5 +1,58 @@
 import { query } from '../../config/db.js';
 
+export async function ensureRunLogTable() {
+  await query(`CREATE TABLE IF NOT EXISTS schedule_run_logs (
+    log_id        INT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id   INT          NOT NULL,
+    triggered_by  ENUM('AUTO','MANUAL') DEFAULT 'AUTO',
+    status        ENUM('SUCCESS','FAILED','PARTIAL') DEFAULT 'SUCCESS',
+    rows_exported INT          NULL,
+    recipients    TEXT         NULL,
+    emailed       TINYINT(1)   DEFAULT 0,
+    error_message TEXT         NULL,
+    duration_ms   INT          NULL,
+    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB`);
+}
+
+export async function recordRunLog({ scheduleId, triggeredBy = 'AUTO', status, rowsExported, recipients, emailed, errorMessage, durationMs }) {
+  await ensureRunLogTable();
+  await query(`INSERT INTO schedule_run_logs
+    (schedule_id, triggered_by, status, rows_exported, recipients, emailed, error_message, duration_ms)
+    VALUES (:scheduleId, :triggeredBy, :status, :rowsExported, :recipients, :emailed, :errorMessage, :durationMs)`,
+    { scheduleId, triggeredBy, status, rowsExported: rowsExported ?? null,
+      recipients: recipients ?? null, emailed: emailed ? 1 : 0,
+      errorMessage: errorMessage ?? null, durationMs: durationMs ?? null });
+}
+
+export async function listRunLogs(scheduleId, limit = 20) {
+  await ensureRunLogTable();
+  return query(`SELECT * FROM schedule_run_logs
+                 WHERE schedule_id = :scheduleId
+                 ORDER BY created_at DESC LIMIT :limit`, { scheduleId, limit });
+}
+
+export async function allRecentLogs(limit = 50) {
+  await ensureRunLogTable();
+  return query(`SELECT l.*, s.name AS schedule_name, s.report_type
+                  FROM schedule_run_logs l
+                  JOIN scheduled_reports s ON s.schedule_id = l.schedule_id
+                 ORDER BY l.created_at DESC LIMIT :limit`, { limit });
+}
+
+export async function scheduleStats() {
+  await ensureRunLogTable();
+  const [totals] = await query(`SELECT COUNT(*) AS total_schedules,
+    SUM(is_active) AS active_schedules FROM scheduled_reports`);
+  const [runStats] = await query(`SELECT COUNT(*) AS total_runs,
+    SUM(status='SUCCESS') AS successful, SUM(status='FAILED') AS failed,
+    SUM(emailed) AS emails_sent FROM schedule_run_logs`);
+  const nextDue = await query(
+    `SELECT name, next_run_at FROM scheduled_reports
+      WHERE is_active = 1 ORDER BY next_run_at ASC LIMIT 1`);
+  return { ...totals, ...runStats, nextDue: nextDue[0] ?? null };
+}
+
 function nextRun(frequency, dayOfWeek, dayOfMonth) {
   const now = new Date();
   const d = new Date(now);

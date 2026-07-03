@@ -74,6 +74,9 @@ router.get('/map/heat', operatorScope, asyncHandler(async (req, res) =>
 router.get('/stats', operatorScope, asyncHandler(async (req, res) =>
   ok(res, await service.inventoryStats(req.scope?.operatorId ?? null))));
 
+router.get('/breakdown', operatorScope, asyncHandler(async (req, res) =>
+  ok(res, await service.inventoryBreakdown(req.scope?.operatorId ?? null))));
+
 router.get('/reference', operatorScope, asyncHandler(async (req, res) =>
   ok(res, await service.resolveReference({
     operatorId: req.scope?.operatorId ?? null,

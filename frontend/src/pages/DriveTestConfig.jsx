@@ -1,16 +1,208 @@
 import { useEffect, useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Stack, Grid, TextField, Button,
-  Alert, Divider, Slider, Chip,
+  Alert, Slider, Chip, alpha, Tooltip,
 } from '@mui/material';
-import SettingsIcon from '@mui/icons-material/Settings';
 import SaveIcon from '@mui/icons-material/Save';
 import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt';
-import SpeedIcon from '@mui/icons-material/Speed';
-import TuneIcon from '@mui/icons-material/Tune';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+import WifiIcon from '@mui/icons-material/Wifi';
+import DownloadIcon from '@mui/icons-material/Download';
+import UploadIcon from '@mui/icons-material/Upload';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
+import FindInPageIcon from '@mui/icons-material/FindInPage';
+import GridViewIcon from '@mui/icons-material/GridView';
+import RadarIcon from '@mui/icons-material/Radar';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { get, put } from '../api/client';
 import { Loading } from '../components/ui';
 
+/* ── per-metric visual config ───────────────────────────────────────────── */
+const METRICS = [
+  {
+    key: 'rsrp_threshold', label: 'RSRP', unit: 'dBm',
+    min: -120, max: -70, step: 5, color: '#3da9fc',
+    icon: <SignalCellularAltIcon />,
+    desc: 'Reference Signal Received Power — minimum acceptable signal level',
+    bands: [
+      { from: -120, to: -100, color: '#e0413b', label: 'Poor' },
+      { from: -100, to: -90,  color: '#e6a700', label: 'Fair' },
+      { from: -90,  to: -80,  color: '#3da9fc', label: 'Good' },
+      { from: -80,  to: -70,  color: '#2e9e5b', label: 'Excellent' },
+    ],
+  },
+  {
+    key: 'rsrq_threshold', label: 'RSRQ', unit: 'dB',
+    min: -20, max: 0, step: 1, color: '#ef6c00',
+    icon: <NetworkCheckIcon />,
+    desc: 'Reference Signal Received Quality — signal quality floor',
+    bands: [
+      { from: -20, to: -15, color: '#e0413b', label: 'Poor' },
+      { from: -15, to: -10, color: '#e6a700', label: 'Fair' },
+      { from: -10, to: -5,  color: '#3da9fc', label: 'Good' },
+      { from: -5,  to: 0,   color: '#2e9e5b', label: 'Excellent' },
+    ],
+  },
+  {
+    key: 'sinr_threshold', label: 'SINR', unit: 'dB',
+    min: -5, max: 20, step: 1, color: '#2e9e5b',
+    icon: <WifiIcon />,
+    desc: 'Signal to Interference + Noise Ratio — interference tolerance',
+    bands: [
+      { from: -5, to: 0,  color: '#e0413b', label: 'Poor' },
+      { from: 0,  to: 7,  color: '#e6a700', label: 'Fair' },
+      { from: 7,  to: 13, color: '#3da9fc', label: 'Good' },
+      { from: 13, to: 20, color: '#2e9e5b', label: 'Excellent' },
+    ],
+  },
+  {
+    key: 'dl_threshold', label: 'DL Throughput', unit: 'kbps',
+    min: 500, max: 20000, step: 500, color: '#9c27b0',
+    icon: <DownloadIcon />,
+    desc: 'Minimum downlink speed required for compliance',
+    bands: [
+      { from: 500,   to: 2000,  color: '#e0413b', label: 'Poor' },
+      { from: 2000,  to: 5000,  color: '#e6a700', label: 'Fair' },
+      { from: 5000,  to: 10000, color: '#3da9fc', label: 'Good' },
+      { from: 10000, to: 20000, color: '#2e9e5b', label: 'Excellent' },
+    ],
+  },
+  {
+    key: 'ul_threshold', label: 'UL Throughput', unit: 'kbps',
+    min: 100, max: 5000, step: 100, color: '#00acc1',
+    icon: <UploadIcon />,
+    desc: 'Minimum uplink speed required for compliance',
+    bands: [
+      { from: 100,  to: 500,  color: '#e0413b', label: 'Poor' },
+      { from: 500,  to: 1000, color: '#e6a700', label: 'Fair' },
+      { from: 1000, to: 2000, color: '#3da9fc', label: 'Good' },
+      { from: 2000, to: 5000, color: '#2e9e5b', label: 'Excellent' },
+    ],
+  },
+];
+
+const ANALYSIS_FIELDS = [
+  {
+    key: 'gap_min_samples', label: 'Gap Min Samples', icon: <FindInPageIcon />,
+    color: '#e6a700', desc: 'Consecutive weak samples required to flag a coverage gap',
+  },
+  {
+    key: 'segment_size', label: 'Segment Size', unit: 'samples', icon: <GridViewIcon />,
+    color: '#3da9fc', desc: 'Samples per route segment for heatmap analysis',
+  },
+  {
+    key: 'nearby_radius_km', label: 'Nearby Sites Radius', unit: 'km', icon: <RadarIcon />,
+    color: '#2e9e5b', desc: 'Search radius for cell towers near route', step: 0.5,
+  },
+];
+
+/* ── threshold band bar ─────────────────────────────────────────────────── */
+function BandBar({ bands, value, min, max }) {
+  const total = max - min;
+  const thumbPct = ((value - min) / total) * 100;
+  return (
+    <Box sx={{ position: 'relative', height: 8, borderRadius: 4, overflow: 'hidden', mt: 1 }}>
+      <Box sx={{ display: 'flex', height: '100%', width: '100%' }}>
+        {bands.map((b) => (
+          <Box key={b.label}
+            sx={{ flex: (b.to - b.from) / total, bgcolor: b.color, opacity: 0.55 }} />
+        ))}
+      </Box>
+      {/* thumb marker */}
+      <Box sx={{
+        position: 'absolute', top: '50%', left: `${thumbPct}%`,
+        transform: 'translate(-50%, -50%)',
+        width: 14, height: 14, borderRadius: '50%',
+        bgcolor: '#fff', border: '2.5px solid',
+        borderColor: (() => {
+          const band = bands.find(b => value >= b.from && value < b.to) ?? bands[bands.length - 1];
+          return band.color;
+        })(),
+        boxShadow: '0 0 6px rgba(0,0,0,.6)',
+        zIndex: 1,
+      }} />
+    </Box>
+  );
+}
+
+/* ── single metric card ─────────────────────────────────────────────────── */
+function MetricCard({ m, value, onChange }) {
+  const activeBand = m.bands.find(b => value >= b.from && value < b.to) ?? m.bands[m.bands.length - 1];
+  return (
+    <Card sx={{
+      height: '100%',
+      border: `1px solid ${alpha(m.color, 0.25)}`,
+      borderLeft: `4px solid ${m.color}`,
+      position: 'relative', overflow: 'visible',
+    }}>
+      <CardContent sx={{ pb: '16px !important' }}>
+        {/* header */}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box sx={{
+              width: 40, height: 40, borderRadius: 2,
+              bgcolor: alpha(m.color, 0.15),
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: m.color, flexShrink: 0,
+            }}>
+              {m.icon}
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>{m.label}</Typography>
+              <Typography variant="caption" color="text.secondary">{m.desc}</Typography>
+            </Box>
+          </Stack>
+          <Chip
+            label={activeBand.label}
+            size="small"
+            sx={{ bgcolor: alpha(activeBand.color, 0.18), color: activeBand.color, fontWeight: 700, fontSize: 11 }}
+          />
+        </Stack>
+
+        {/* big value */}
+        <Box sx={{
+          bgcolor: alpha(m.color, 0.07), borderRadius: 2, p: 1.5, mb: 2,
+          display: 'flex', alignItems: 'baseline', gap: 0.5,
+        }}>
+          <Typography variant="h4" fontWeight={800} sx={{ color: m.color, lineHeight: 1 }}>
+            {value}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>{m.unit}</Typography>
+        </Box>
+
+        {/* slider */}
+        <Slider
+          value={value}
+          onChange={(_, v) => onChange(v)}
+          min={m.min} max={m.max} step={m.step}
+          valueLabelDisplay="auto"
+          valueLabelFormat={(v) => `${v} ${m.unit}`}
+          sx={{
+            color: m.color, mt: 0.5,
+            '& .MuiSlider-thumb': { width: 18, height: 18 },
+            '& .MuiSlider-rail': { opacity: 0.25 },
+          }}
+        />
+        <Stack direction="row" justifyContent="space-between" sx={{ mt: -0.5 }}>
+          <Typography variant="caption" color="text.secondary">{m.min} {m.unit}</Typography>
+          <Typography variant="caption" color="text.secondary">{m.max} {m.unit}</Typography>
+        </Stack>
+
+        {/* band bar */}
+        <BandBar bands={m.bands} value={value} min={m.min} max={m.max} />
+        <Stack direction="row" justifyContent="space-between" mt={0.75}>
+          {m.bands.map(b => (
+            <Typography key={b.label} variant="caption" sx={{ color: b.color, fontSize: 9, fontWeight: 600 }}>
+              {b.label}
+            </Typography>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── main page ──────────────────────────────────────────────────────────── */
 export default function DriveTestConfig() {
   const [config, setConfig] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -37,139 +229,192 @@ export default function DriveTestConfig() {
   if (!config) return <Loading height={400} />;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Stack direction="row" spacing={1} alignItems="center">
-          <SettingsIcon color="primary" />
-          <Typography variant="h5">Drive Test Configuration</Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+
+      {/* ── page header ── */}
+      <Box sx={{
+        borderRadius: 3, p: 3,
+        background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #1565c0 100%)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <Box sx={{ position: 'absolute', top: -30, right: -30, width: 150, height: 150, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
+        <Box sx={{ position: 'absolute', bottom: -20, right: 80, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography variant="h5" fontWeight={800} color="#fff">Drive Test Configuration</Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 0.5 }}>
+              Set compliance thresholds and analysis parameters for drive test evaluation
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={saving ? null : saved ? <CheckCircleIcon /> : <SaveIcon />}
+            onClick={handleSave}
+            disabled={saving}
+            sx={{
+              bgcolor: saved ? '#2e9e5b' : '#fff',
+              color: saved ? '#fff' : '#1565c0',
+              fontWeight: 700,
+              px: 3,
+              '&:hover': { bgcolor: saved ? '#2e9e5b' : alpha('#fff', 0.9) },
+              '&.Mui-disabled': { bgcolor: alpha('#fff', 0.4), color: alpha('#1565c0', 0.5) },
+            }}
+          >
+            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Configuration'}
+          </Button>
         </Stack>
-        <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Configuration'}
-        </Button>
+
+        {saved && (
+          <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mt: 2, bgcolor: alpha('#2e9e5b', 0.15), color: '#a5d6a7', border: '1px solid #2e9e5b' }}>
+            Configuration saved successfully.
+          </Alert>
+        )}
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      </Box>
+
+      {/* ── section label ── */}
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ width: 4, height: 22, borderRadius: 2, bgcolor: '#3da9fc' }} />
+        <Typography variant="subtitle1" fontWeight={700}>Compliance Thresholds</Typography>
+        <Typography variant="caption" color="text.secondary">— samples below these values are flagged as non-compliant</Typography>
       </Stack>
 
-      {saved && <Alert severity="success">Configuration saved successfully.</Alert>}
-      {error && <Alert severity="error">{error}</Alert>}
+      {/* ── metric cards ── */}
+      <Grid container spacing={2}>
+        {METRICS.map((m) => (
+          <Grid key={m.key} item xs={12} sm={6} lg={4}>
+            <MetricCard m={m} value={config[m.key] ?? 0} onChange={(v) => update(m.key, v)} />
+          </Grid>
+        ))}
+      </Grid>
 
-      {/* Compliance Thresholds */}
-      <Card>
+      {/* ── coverage target ── */}
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ width: 4, height: 22, borderRadius: 2, bgcolor: '#ff7900' }} />
+        <Typography variant="subtitle1" fontWeight={700}>Coverage Target</Typography>
+        <Typography variant="caption" color="text.secondary">— minimum % of samples that must pass the RSRP threshold</Typography>
+      </Stack>
+
+      <Card sx={{ border: '1px solid', borderColor: alpha('#ff7900', 0.25), borderLeft: '4px solid #ff7900' }}>
         <CardContent>
-          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-            <SignalCellularAltIcon color="primary" />
-            <Typography variant="h6">Compliance Thresholds</Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Samples below these values are flagged as non-compliant in drive test analysis.
-          </Typography>
+          <Grid container spacing={4} alignItems="center">
+            {/* ring */}
+            <Grid item xs={12} sm="auto">
+              <Box sx={{ position: 'relative', width: 120, height: 120, mx: 'auto' }}>
+                <svg viewBox="0 0 120 120" width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,121,0,0.15)" strokeWidth="12" />
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#ff7900" strokeWidth="12"
+                    strokeDasharray={`${2 * Math.PI * 50}`}
+                    strokeDashoffset={`${2 * Math.PI * 50 * (1 - (config.coverage_target ?? 95) / 100)}`}
+                    strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.3s' }} />
+                </svg>
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <Typography variant="h4" fontWeight={800} sx={{ color: '#ff7900', lineHeight: 1 }}>
+                    {config.coverage_target ?? 95}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>%</Typography>
+                </Box>
+              </Box>
+            </Grid>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>RSRP Threshold</Typography>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Slider value={config.rsrp_threshold} onChange={(_, v) => update('rsrp_threshold', v)}
-                  min={-120} max={-70} step={5}
-                  marks={[{ value: -120, label: '-120' }, { value: -100, label: '-100' }, { value: -70, label: '-70' }]}
-                  valueLabelDisplay="on" valueLabelFormat={(v) => `${v} dBm`} />
+            {/* slider */}
+            <Grid item xs={12} sm>
+              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                <TrackChangesIcon sx={{ color: '#ff7900', fontSize: 20 }} />
+                <Typography variant="subtitle2" fontWeight={700}>Coverage Target (%)</Typography>
+                <Chip
+                  size="small"
+                  label={(config.coverage_target ?? 95) >= 95 ? 'Strict' : (config.coverage_target ?? 95) >= 85 ? 'Standard' : 'Lenient'}
+                  sx={{
+                    bgcolor: alpha((config.coverage_target ?? 95) >= 95 ? '#2e9e5b' : (config.coverage_target ?? 95) >= 85 ? '#e6a700' : '#e0413b', 0.15),
+                    color: (config.coverage_target ?? 95) >= 95 ? '#2e9e5b' : (config.coverage_target ?? 95) >= 85 ? '#e6a700' : '#e0413b',
+                    fontWeight: 700, fontSize: 11,
+                  }}
+                />
               </Stack>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>RSRQ Threshold</Typography>
-              <Slider value={config.rsrq_threshold} onChange={(_, v) => update('rsrq_threshold', v)}
-                min={-20} max={0} step={1}
-                marks={[{ value: -20, label: '-20' }, { value: -15, label: '-15' }, { value: 0, label: '0' }]}
-                valueLabelDisplay="on" valueLabelFormat={(v) => `${v} dB`} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>SINR Threshold</Typography>
-              <Slider value={config.sinr_threshold} onChange={(_, v) => update('sinr_threshold', v)}
-                min={-5} max={20} step={1}
-                marks={[{ value: -5, label: '-5' }, { value: 0, label: '0' }, { value: 20, label: '20' }]}
-                valueLabelDisplay="on" valueLabelFormat={(v) => `${v} dB`} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>DL Throughput Threshold</Typography>
-              <Slider value={config.dl_threshold} onChange={(_, v) => update('dl_threshold', v)}
-                min={500} max={20000} step={500}
-                marks={[{ value: 500, label: '500' }, { value: 2000, label: '2000' }, { value: 20000, label: '20000' }]}
-                valueLabelDisplay="on" valueLabelFormat={(v) => `${v} kbps`} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>UL Throughput Threshold</Typography>
-              <Slider value={config.ul_threshold} onChange={(_, v) => update('ul_threshold', v)}
-                min={100} max={5000} step={100}
-                marks={[{ value: 100, label: '100' }, { value: 500, label: '500' }, { value: 5000, label: '5000' }]}
-                valueLabelDisplay="on" valueLabelFormat={(v) => `${v} kbps`} />
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Coverage Target */}
-      <Card>
-        <CardContent>
-          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-            <SpeedIcon color="primary" />
-            <Typography variant="h6">Coverage Targets</Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Operators should achieve this percentage of samples passing the RSRP threshold.
-          </Typography>
-
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" gutterBottom>Coverage Target (%)</Typography>
-              <Slider value={config.coverage_target} onChange={(_, v) => update('coverage_target', v)}
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                Operators must achieve this percentage of drive-test samples above the RSRP threshold to pass compliance checks.
+              </Typography>
+              <Slider
+                value={config.coverage_target ?? 95}
+                onChange={(_, v) => update('coverage_target', v)}
                 min={70} max={100} step={1}
-                marks={[{ value: 70, label: '70%' }, { value: 95, label: '95%' }, { value: 100, label: '100%' }]}
-                valueLabelDisplay="on" valueLabelFormat={(v) => `${v}%`} />
+                marks={[{ value: 70, label: '70%' }, { value: 80, label: '80%' }, { value: 90, label: '90%' }, { value: 95, label: '95%' }, { value: 100, label: '100%' }]}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${v}%`}
+                sx={{ color: '#ff7900', '& .MuiSlider-thumb': { width: 18, height: 18 } }}
+              />
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {/* Analysis Settings */}
-      <Card>
-        <CardContent>
-          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-            <TuneIcon color="primary" />
-            <Typography variant="h6">Analysis Settings</Typography>
-          </Stack>
+      {/* ── analysis settings ── */}
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ width: 4, height: 22, borderRadius: 2, bgcolor: '#8b5cf6' }} />
+        <Typography variant="subtitle1" fontWeight={700}>Analysis Settings</Typography>
+        <Typography variant="caption" color="text.secondary">— parameters for route segmentation and gap detection</Typography>
+      </Stack>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth type="number" label="Gap Min Samples"
-                helperText="Minimum consecutive weak samples to flag as a coverage gap"
-                value={config.gap_min_samples} onChange={(e) => update('gap_min_samples', Number(e.target.value))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth type="number" label="Segment Size (samples)"
-                helperText="Number of samples per route segment in analysis"
-                value={config.segment_size} onChange={(e) => update('segment_size', Number(e.target.value))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField size="small" fullWidth type="number" label="Nearby Sites Radius (km)"
-                helperText="Search radius for cell towers near drive test route"
-                inputProps={{ step: 0.5 }}
-                value={config.nearby_radius_km} onChange={(e) => update('nearby_radius_km', Number(e.target.value))} />
-            </Grid>
+      <Grid container spacing={2}>
+        {ANALYSIS_FIELDS.map((f) => (
+          <Grid key={f.key} item xs={12} sm={4}>
+            <Card sx={{ height: '100%', border: `1px solid ${alpha(f.color, 0.25)}`, borderLeft: `4px solid ${f.color}` }}>
+              <CardContent>
+                <Stack direction="row" spacing={1.5} alignItems="center" mb={2}>
+                  <Box sx={{
+                    width: 36, height: 36, borderRadius: 2,
+                    bgcolor: alpha(f.color, 0.15), color: f.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {f.icon}
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} lineHeight={1.2}>{f.label}</Typography>
+                    {f.unit && <Typography variant="caption" color="text.secondary">{f.unit}</Typography>}
+                  </Box>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" display="block" mb={2}>{f.desc}</Typography>
+                <TextField
+                  size="small" fullWidth type="number"
+                  value={config[f.key] ?? ''}
+                  onChange={(e) => update(f.key, Number(e.target.value))}
+                  inputProps={{ step: f.step ?? 1 }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-focused fieldset': { borderColor: f.color },
+                    },
+                  }}
+                />
+              </CardContent>
+            </Card>
           </Grid>
-        </CardContent>
-      </Card>
+        ))}
+      </Grid>
 
-      {/* Current Values */}
-      <Card>
-        <CardContent>
-          <Typography variant="subtitle2" mb={1}>Current Saved Configuration</Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip label={`RSRP: ${config.rsrp_threshold} dBm`} size="small" variant="outlined" />
-            <Chip label={`RSRQ: ${config.rsrq_threshold} dB`} size="small" variant="outlined" />
-            <Chip label={`SINR: ${config.sinr_threshold} dB`} size="small" variant="outlined" />
-            <Chip label={`DL: ${config.dl_threshold} kbps`} size="small" variant="outlined" />
-            <Chip label={`UL: ${config.ul_threshold} kbps`} size="small" variant="outlined" />
-            <Chip label={`Target: ${config.coverage_target}%`} size="small" color="primary" variant="outlined" />
+      {/* ── summary strip ── */}
+      <Card sx={{ bgcolor: alpha('#3da9fc', 0.05), border: '1px solid', borderColor: alpha('#3da9fc', 0.2) }}>
+        <CardContent sx={{ py: '12px !important' }}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" gap={1}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mr: 0.5 }}>
+              Active thresholds:
+            </Typography>
+            {[
+              { label: `RSRP ≥ ${config.rsrp_threshold} dBm`, color: '#3da9fc' },
+              { label: `RSRQ ≥ ${config.rsrq_threshold} dB`, color: '#ef6c00' },
+              { label: `SINR ≥ ${config.sinr_threshold} dB`, color: '#2e9e5b' },
+              { label: `DL ≥ ${config.dl_threshold} kbps`, color: '#9c27b0' },
+              { label: `UL ≥ ${config.ul_threshold} kbps`, color: '#00acc1' },
+              { label: `Target ${config.coverage_target}%`, color: '#ff7900' },
+            ].map(({ label, color }) => (
+              <Chip key={label} label={label} size="small"
+                sx={{ bgcolor: alpha(color, 0.12), color, fontWeight: 700, fontSize: 11, border: `1px solid ${alpha(color, 0.3)}` }} />
+            ))}
           </Stack>
         </CardContent>
       </Card>
+
     </Box>
   );
 }

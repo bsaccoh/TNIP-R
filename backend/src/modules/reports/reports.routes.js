@@ -1,17 +1,21 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/rbac.js';
+import { requireAccess } from '../../middleware/rbac.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import * as service from './reports.service.js';
 import schedulesRoutes from './schedules.routes.js';
+import templatesRoutes from './templates.routes.js';
 
 const router = Router();
 router.use(authenticate);
 router.use('/schedules', schedulesRoutes);
+router.use('/templates', templatesRoutes);
+
+const canRead = requireAccess({ roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST'], permissions: ['reports:read'] });
 
 const SHEET_NAMES = { kpi: 'KPI_Performance', compliance: 'Compliance', trend: 'KPI_Trend', anomaly: 'Anomalies' };
 
-router.get('/export/excel', requireRole('REGULATOR_ADMIN', 'REGULATOR_ANALYST'), asyncHandler(async (req, res) => {
+router.get('/export/excel', canRead, asyncHandler(async (req, res) => {
   const operatorId = req.query.operatorId || null;
   const from = req.query.from || null;
   const to = req.query.to || null;

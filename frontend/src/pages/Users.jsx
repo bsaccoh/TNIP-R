@@ -164,7 +164,7 @@ function UserDialog({ open, user, roles, operators, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (e) {
-      setErr(e?.response?.data?.message || 'Save failed');
+      setErr(e?.response?.data?.error?.message || e?.response?.data?.message || 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -230,7 +230,7 @@ function ResetPasswordDialog({ open, user, onClose }) {
       await post(`/users/${user.user_id}/reset-password`, { newPassword: pwd });
       setDone(true);
     } catch (e) {
-      setErr(e?.response?.data?.message || 'Failed');
+      setErr(e?.response?.data?.error?.message || e?.response?.data?.message || 'Failed');
     } finally { setSaving(false); }
   };
 

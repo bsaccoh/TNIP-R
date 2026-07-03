@@ -1,7 +1,12 @@
 import { query } from '../../config/db.js';
 
-/** National Executive Dashboard payload. */
-export async function nationalExecutive() {
+/** National Executive Dashboard payload.
+ *  @param {string} [from]  ISO date string YYYY-MM-DD (optional)
+ *  @param {string} [to]    ISO date string YYYY-MM-DD (optional)
+ */
+export async function nationalExecutive({ from, to } = {}) {
+  const dateParams = from && to ? { from, to } : null;
+
   const [counts] = await query(
     `SELECT
        (SELECT COUNT(*) FROM operators WHERE deleted_at IS NULL AND status='ACTIVE') AS operators,
@@ -12,27 +17,35 @@ export async function nationalExecutive() {
   const [avail] = await query(
     `SELECT AVG(ck.value) AS national_availability
        FROM calculated_kpis ck JOIN kpi_definitions k ON k.kpi_id=ck.kpi_id
-      WHERE k.kpi_key='CELL_AVAILABILITY' AND ck.granularity='DAY'`
+      WHERE k.kpi_key='CELL_AVAILABILITY' AND ck.granularity='DAY'
+        ${dateParams ? 'AND DATE(ck.ts) BETWEEN :from AND :to' : ''}`,
+    dateParams ?? {}
   );
 
   const complianceByOperator = await query(
     `SELECT o.operator_id, o.operator_name, cr.status, COUNT(*) AS count
        FROM operators o LEFT JOIN compliance_results cr ON cr.operator_id=o.operator_id
       WHERE o.deleted_at IS NULL
-      GROUP BY o.operator_id, o.operator_name, cr.status`
+        ${dateParams ? 'AND (cr.period IS NULL OR cr.period BETWEEN :from AND :to)' : ''}
+      GROUP BY o.operator_id, o.operator_name, cr.status`,
+    dateParams ?? {}
   );
 
   const recentUploads = await query(
     `SELECT pf.pm_file_id, o.operator_name, pf.file_name, pf.status, pf.upload_date
        FROM pm_files pf JOIN operators o ON o.operator_id=pf.operator_id
-      ORDER BY pf.upload_date DESC LIMIT 8`
+      ${dateParams ? 'WHERE DATE(pf.upload_date) BETWEEN :from AND :to' : ''}
+      ORDER BY pf.upload_date DESC LIMIT 8`,
+    dateParams ?? {}
   );
 
   const ranking = await query(
     `SELECT o.operator_name, r.qos_score, r.rank_position, r.trend, r.period
        FROM operator_rankings r JOIN operators o ON o.operator_id=r.operator_id
-      WHERE r.period = (SELECT MAX(period) FROM operator_rankings)
-      ORDER BY r.rank_position`
+      WHERE r.period = (SELECT MAX(period) FROM operator_rankings
+                        ${dateParams ? 'WHERE period BETWEEN :from AND :to' : ''})
+      ORDER BY r.rank_position`,
+    dateParams ?? {}
   );
 
   const techDistribution = await query(
@@ -43,10 +56,11 @@ export async function nationalExecutive() {
 
   const recommendations = await query(
     `SELECT title, body, severity, created_at FROM ai_recommendations
-      ORDER BY created_at DESC LIMIT 5`
+      ${dateParams ? 'WHERE DATE(created_at) BETWEEN :from AND :to' : ''}
+      ORDER BY created_at DESC LIMIT 5`,
+    dateParams ?? {}
   );
 
-  // National QoS score = average of operator composite scores (fallback: compliance pass rate).
   const nationalQos = ranking.length
     ? ranking.reduce((s, r) => s + (r.qos_score || 0), 0) / ranking.length
     : null;

@@ -30,7 +30,8 @@
         "android.permission.READ_PHONE_STATE",
         "android.permission.INTERNET",
         "android.permission.FOREGROUND_SERVICE"
-      ]
+      ],
+      "package": "com.anonymous.tniprmobile"
     },
     "web": {
       "output": "static",
