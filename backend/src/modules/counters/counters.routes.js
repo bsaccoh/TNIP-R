@@ -14,12 +14,15 @@ const canWrite = requireAccess({ roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], per
 router.get('/', asyncHandler(async (req, res) => {
   const { page, limit, offset } = paginate(req);
   const { rows, total } = await service.listCounters({
-    status: req.query.status, technology: req.query.technology, search: req.query.search, limit, offset,
+    status: req.query.status, technology: req.query.technology, search: req.query.search,
+    operatorId: req.query.operatorId, vendorId: req.query.vendorId, limit, offset,
   });
   return ok(res, rows, pageMeta(page, limit, total));
 }));
 
 router.get('/stats', asyncHandler(async (_req, res) => ok(res, await service.counterStats())));
+
+router.get('/vendors', asyncHandler(async (_req, res) => ok(res, await service.listVendors())));
 
 const importSchema = z.object({
   technology: z.enum(['2G', '3G', '4G', '5G']),
@@ -45,6 +48,8 @@ const singleSchema = z.object({
   measurement_object: z.string().optional(),
   aggregation: z.string().optional(),
   unit: z.string().optional(),
+  operator_id: z.union([z.string(), z.number()]).nullable().optional(),
+  vendor_id: z.union([z.string(), z.number()]).nullable().optional(),
 });
 
 router.post('/', canWrite,

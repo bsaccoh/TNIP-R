@@ -25,12 +25,16 @@ export default function CounterDictionary() {
   const [search, setSearch] = useState('');
   const [tech, setTech] = useState('');
   const [status, setStatus] = useState('');
+  const [operatorId, setOperatorId] = useState('');
+  const [operators, setOperators] = useState([]);
+  const [vendorId, setVendorId] = useState('');
+  const [vendors, setVendors] = useState([]);
   const [page, setPage] = useState(1);
 
   const fetchCounters = useCallback(async (p = page) => {
     setLoading(true);
     try {
-      const res = await get('/counters', { page: p, limit: 10, search: search || undefined, technology: tech || undefined, status: status || undefined });
+      const res = await get('/counters', { page: p, limit: 10, search: search || undefined, technology: tech || undefined, status: status || undefined, operatorId: operatorId || undefined, vendorId: vendorId || undefined });
       setRows(res.data || []);
       setMeta(res.meta || { page: 1, limit: 10, total: 0 });
     } catch {
@@ -39,9 +43,14 @@ export default function CounterDictionary() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, tech, status]);
+  }, [page, search, tech, status, operatorId, vendorId]);
 
-  useEffect(() => { fetchCounters(page); }, [page, tech, status]);
+  useEffect(() => { fetchCounters(page); }, [page, tech, status, operatorId, vendorId]);
+
+  useEffect(() => {
+    get('/operators').then((r) => setOperators(r.data ?? [])).catch(() => {});
+    get('/counters/vendors').then((r) => setVendors(r.data ?? [])).catch(() => {});
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -123,6 +132,21 @@ export default function CounterDictionary() {
                 <MenuItem value="UNKNOWN">UNKNOWN</MenuItem>
               </Select>
             </FormControl>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Vendor</InputLabel>
+              <Select label="Vendor" value={vendorId} onChange={(e) => { setVendorId(e.target.value); setPage(1); }}>
+                <MenuItem value="">All</MenuItem>
+                {vendors.map((v) => <MenuItem key={v.vendor_id} value={v.vendor_id}>{v.vendor_name || v.vendor_key}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Operator</InputLabel>
+              <Select label="Operator" value={operatorId} onChange={(e) => { setOperatorId(e.target.value); setPage(1); }}>
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="null">Shared (global)</MenuItem>
+                {operators.map((o) => <MenuItem key={o.operator_id} value={o.operator_id}>{o.operator_name}</MenuItem>)}
+              </Select>
+            </FormControl>
             <form onSubmit={handleSearch} style={{ display: 'flex', flex: 1, gap: '8px', minWidth: 200 }}>
               <TextField size="small" fullWidth placeholder="Search counter ID or name…"
                 value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -146,6 +170,8 @@ export default function CounterDictionary() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Tech</TableCell>
+                      <TableCell>Vendor</TableCell>
+                      <TableCell>Operator</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Counter ID / Key</TableCell>
                       <TableCell>Counter Name</TableCell>
@@ -161,6 +187,14 @@ export default function CounterDictionary() {
                       <TableRow key={c.counter_id} hover>
                         <TableCell>
                           <Chip size="small" label={c.tech_key || '—'} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">{c.vendor_key || '—'}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          {c.operator_name
+                            ? <Chip size="small" variant="outlined" label={c.operator_name} />
+                            : <Typography variant="caption" color="text.disabled">Shared</Typography>}
                         </TableCell>
                         <TableCell>
                           <Chip size="small"
@@ -205,6 +239,8 @@ export default function CounterDictionary() {
       <CounterFormDialog
         open={editOpen}
         initial={editRow}
+        operators={operators}
+        vendors={vendors}
         onClose={() => setEditOpen(false)}
         onSaved={reload}
       />
@@ -222,7 +258,7 @@ export default function CounterDictionary() {
 // ──────────────────────────────────────────────────
 // Add / Edit single counter dialog
 // ──────────────────────────────────────────────────
-function CounterFormDialog({ open, initial, onClose, onSaved }) {
+function CounterFormDialog({ open, initial, operators = [], vendors = [], onClose, onSaved }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
@@ -240,9 +276,11 @@ function CounterFormDialog({ open, initial, onClose, onSaved }) {
         measurement_object: initial.measurement_object || '',
         aggregation: initial.aggregation || 'SUM',
         unit: initial.raw_unit || '',
+        operator_id: initial.operator_id ?? '',
+        vendor_id: initial.vendor_id ?? '',
       });
     } else {
-      setForm({ counter_key: '', counter_name: '', technology: '3G', category: '', measurement_object: '', aggregation: 'SUM', unit: '' });
+      setForm({ counter_key: '', counter_name: '', technology: '3G', category: '', measurement_object: '', aggregation: 'SUM', unit: '', operator_id: '', vendor_id: '' });
     }
   }, [open, initial]);
 
@@ -272,6 +310,8 @@ function CounterFormDialog({ open, initial, onClose, onSaved }) {
           measurement_object: form.measurement_object || undefined,
           aggregation: form.aggregation || 'SUM',
           unit: form.unit || undefined,
+          operator_id: form.operator_id === '' ? null : form.operator_id,
+          vendor_id: form.vendor_id === '' ? undefined : form.vendor_id,
         });
       }
       onSaved();
@@ -295,9 +335,25 @@ function CounterFormDialog({ open, initial, onClose, onSaved }) {
           <TextField label="Counter Name *" size="small" value={form.counter_name || ''} onChange={set('counter_name')} />
 
           <FormControl size="small" fullWidth>
+            <InputLabel>Vendor</InputLabel>
+            <Select label="Vendor" value={form.vendor_id ?? ''} onChange={set('vendor_id')} disabled={isEdit}>
+              <MenuItem value=""><em>Default (Huawei)</em></MenuItem>
+              {vendors.map((v) => <MenuItem key={v.vendor_id} value={v.vendor_id}>{v.vendor_name || v.vendor_key}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" fullWidth>
             <InputLabel>Technology</InputLabel>
             <Select label="Technology" value={form.technology || '3G'} onChange={set('technology')} disabled={isEdit}>
               {TECHS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel>Operator</InputLabel>
+            <Select label="Operator" value={form.operator_id ?? ''} onChange={set('operator_id')}>
+              <MenuItem value=""><em>Shared / all operators</em></MenuItem>
+              {operators.map((o) => <MenuItem key={o.operator_id} value={o.operator_id}>{o.operator_name}</MenuItem>)}
             </Select>
           </FormControl>
 
