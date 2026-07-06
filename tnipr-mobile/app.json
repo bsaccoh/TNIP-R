@@ -8,7 +8,7 @@
     "scheme": "tniprmobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "sl.gov.natcom.tnipr",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TNIP-R Drive Tester needs location to record GPS coordinates during drive tests.",
         "NSLocationAlwaysUsageDescription": "TNIP-R Drive Tester needs background location to continue recording when the screen is off.",
@@ -31,7 +31,7 @@
         "android.permission.INTERNET",
         "android.permission.FOREGROUND_SERVICE"
       ],
-      "package": "com.anonymous.tniprmobile"
+      "package": "sl.gov.natcom.tnipr"
     },
     "web": {
       "output": "static",

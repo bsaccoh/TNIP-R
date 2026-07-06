@@ -12,6 +12,7 @@ import Inventory from './pages/Inventory';
 import Ingestion from './pages/Ingestion';
 import Operators from './pages/Operators';
 import AiAssistant from './pages/AiAssistant';
+import NocMonitoringPage from './pages/NocMonitoringPage';
 import CounterDictionary from './pages/CounterDictionary';
 import KpiBuilder from './pages/KpiBuilder';
 import KpiAnalytics from './pages/KpiAnalytics';
@@ -86,6 +87,7 @@ function AppRoutes() {
         <Route path="counters" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['kpi:read']}><CounterDictionary /></RoleGuard>} />
         <Route path="kpis" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['kpi:write']}><KpiBuilder /></RoleGuard>} />
         <Route path="analytics" element={<KpiAnalytics />} />
+        <Route path="noc" element={<NocMonitoringPage />} />
         <Route path="reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><Reports /></RoleGuard>} />
         <Route path="drive-test" element={<DriveTest />} />
         <Route path="drive-test-campaigns" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST','DRIVE_TEST_USER']}><DriveTestCampaigns /></RoleGuard>} />

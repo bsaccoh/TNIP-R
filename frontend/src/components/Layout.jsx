@@ -85,6 +85,7 @@ const NAV = [
       { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
       { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
+      { to: '/noc', label: 'NOC Monitoring', icon: <RadarIcon /> },
       { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
     ],
   },

@@ -675,7 +675,7 @@ export default function FieldApp() {
           <SignalCellularAltIcon sx={{ color: '#38bdf8', fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body1" fontWeight={700} sx={{ lineHeight: 1.1 }}>TNIP-R Field</Typography>
+          <Typography variant="body1" fontWeight={700} sx={{ lineHeight: 1.1 }}>TNIP-R Field (Manual Fallback)</Typography>
           <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.6)' }} noWrap>
             {user.fullName || user.email}
           </Typography>
@@ -692,6 +692,11 @@ export default function FieldApp() {
                                  fontSize: '0.62rem', height: 22 }} />}
         <AccuracyBadge accuracy={gps?.accuracy} dark />
       </Box>
+
+      {/* Manual Entry Warning Banner */}
+      <Alert severity="warning" square sx={{ py: 0.5, px: 2, fontSize: '0.72rem', display: 'flex', alignItems: 'center' }}>
+        Notice: This web interface is for manual fallback entry only. For automatic, high-fidelity real-time signal logging, please use the native Android Drive Tester app.
+      </Alert>
 
       {/* Content */}
       <Box sx={{ flex: 1, overflowY: 'auto' }}>

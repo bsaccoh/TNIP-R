@@ -80,19 +80,26 @@ class ExpoTelephonyModule : Module() {
           // ── 5G NR ──
           Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info is CellInfoNr -> {
             val ss = info.cellSignalStrength as? CellSignalStrengthNr ?: continue
+            val identity = info.cellIdentity as? CellIdentityNr
+            
             val rsrp  = ss.ssRsrp.takeIf { it != Int.MIN_VALUE }
             val rsrq  = ss.ssRsrq.takeIf { it != Int.MIN_VALUE }
             val sinr  = ss.ssSinr.takeIf { it != Int.MIN_VALUE }
+            
             result["rsrp"]       = rsrp
             result["rsrq"]       = rsrq
             result["sinr"]       = sinr
             result["technology"] = "5G"
+            result["pci"]        = identity?.pci?.takeIf { it != Int.MAX_VALUE }
+            result["tac"]        = identity?.tac?.takeIf { it != Int.MAX_VALUE }
             break
           }
 
           // ── 4G LTE ──
           info is CellInfoLte -> {
             val ss   = info.cellSignalStrength
+            val identity = info.cellIdentity
+            
             val rsrp = ss.rsrp.takeIf { it != Int.MIN_VALUE && it < 0 }
             val rsrq = ss.rsrq.takeIf { it != Int.MIN_VALUE && it < 0 }
             // rssnr is in units of 0.1 dB on older APIs; divide by 10
@@ -101,10 +108,14 @@ class ExpoTelephonyModule : Module() {
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) it.toDouble()
               else it / 10.0
             }
+            
             result["rsrp"]       = rsrp
             result["rsrq"]       = rsrq
             result["sinr"]       = sinr
             result["technology"] = "4G"
+            result["pci"]        = identity.pci.takeIf { it != Int.MAX_VALUE }
+            result["ci"]         = identity.ci.takeIf { it != Int.MAX_VALUE }
+            result["tac"]        = identity.tac.takeIf { it != Int.MAX_VALUE }
             break
           }
 

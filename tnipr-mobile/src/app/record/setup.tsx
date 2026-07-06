@@ -4,7 +4,6 @@ import {
   ActivityIndicator, Alert, StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useRole } from '@/hooks/useRole';
@@ -53,8 +52,10 @@ export default function SetupScreen() {
 
   useEffect(() => {
     getOperators().then((ops) => {
-      setOperators(ops);
-      if (!operatorId && ops.length) setOperatorId(ops[0].operator_id);
+      if (Array.isArray(ops)) {
+        setOperators(ops);
+        if (!operatorId && ops.length) setOperatorId(ops[0].operator_id);
+      }
     }).catch(() => {});
   }, []);
 
@@ -139,12 +140,35 @@ export default function SetupScreen() {
             Operator *{!isAdmin && <Text style={{ color: t.textMuted, fontWeight: '400' }}> (locked to your account)</Text>}
           </Text>
           {isAdmin ? (
-            <View style={[s.pickerWrap, { borderColor: t.border, backgroundColor: t.inputBg }]}>
-              <Picker selectedValue={operatorId} onValueChange={setOperatorId} style={{ color: t.text }}>
-                {operators.map((o) => (
-                  <Picker.Item key={o.operator_id} label={o.operator_name} value={o.operator_id} />
-                ))}
-              </Picker>
+            <View style={s.operatorGrid}>
+              {operators.length > 0 ? (
+                operators.map((o) => {
+                  const active = operatorId === o.operator_id;
+                  return (
+                    <TouchableOpacity
+                      key={o.operator_id}
+                      style={[
+                        s.operatorChip,
+                        {
+                          borderColor: active ? palette.primary : t.border,
+                          backgroundColor: active ? palette.primary + '10' : t.surface,
+                        },
+                        shadow.sm,
+                      ]}
+                      onPress={() => setOperatorId(o.operator_id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.operatorChipText, { color: active ? palette.primary : t.textSub, fontWeight: active ? '800' : '600' }]}>
+                        {o.operator_name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={{ color: t.textMuted, fontSize: 13, paddingVertical: 8 }}>
+                  No operators loaded. Check server connection.
+                </Text>
+              )}
             </View>
           ) : (
             <View style={[s.lockedField, { borderColor: t.border, backgroundColor: t.inputBg }]}>
@@ -283,7 +307,9 @@ const s = StyleSheet.create({
   card: { borderRadius: radius.lg, borderWidth: 1, padding: space.md, shadowColor: '#000' },
   fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 10 },
   input: { borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, marginBottom: 4 },
-  pickerWrap: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden', marginBottom: 4 },
+  operatorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 4 },
+  operatorChip: { width: '47%', borderWidth: 1.5, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', shadowColor: '#000' },
+  operatorChipText: { fontSize: 13 },
 
   techRow: { flexDirection: 'row', gap: space.sm },
   techChip: { flex: 1, borderWidth: 1.5, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', shadowColor: '#000' },

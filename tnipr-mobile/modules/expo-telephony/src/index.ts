@@ -16,6 +16,12 @@ export interface SignalMetrics {
   ul_throughput?: number | null;
   /** Detected radio technology: '2G' | '3G' | '4G' | '5G' */
   technology?: string | null;
+  /** Physical Cell ID */
+  pci?: number | null;
+  /** Cell Identity */
+  ci?: number | null;
+  /** Tracking Area Code */
+  tac?: number | null;
   /** Error message if permission or hardware access failed */
   error?: string;
 }

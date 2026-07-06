@@ -13,9 +13,38 @@ import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SpeedIcon from '@mui/icons-material/Speed';
+import { Treemap, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PageHeader from '../components/PageHeader';
+
+/* ── Live Monitor Mock Data ── */
+const mockRootCause = [
+  { name: 'Transmission', size: 400, fill: '#005B9F' },
+  { name: 'Radio', size: 300, fill: '#FF7900' },
+  { name: 'Power', size: 200, fill: '#ef4444' },
+  { name: 'Configuration', size: 100, fill: '#10b981' },
+];
+
+const mockResourceUtil = {
+  CPU: 65, Memory: 60, CE: 72, PRB: 68, Transport: 75
+};
+
+const CustomTreemapContent = (props) => {
+  const { depth, x, y, width, height, name } = props;
+  if (depth === 0) return null;
+  const bgColor = props.fill || (props.payload && props.payload.fill) || '#1e293b';
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} style={{ fill: bgColor, stroke: '#121212', strokeWidth: 2 }} />
+      {width > 50 && height > 30 && (
+        <text x={x + width / 2} y={y + height / 2} textAnchor="middle" fill="#fff" fontSize={14} fontWeight={700} dominantBaseline="middle">
+          {name}
+        </text>
+      )}
+    </g>
+  );
+};
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 const SEVERITY_META = {
@@ -232,6 +261,50 @@ export default function RealtimeMonitor() {
         <Grid item xs={6} sm={3}>
           <AlarmCountCard label="Cleared (24h)" value={counts.cleared_24h}
             color="#2e7d32" />
+        </Grid>
+      </Grid>
+
+      {/* Live Monitor Visuals */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} lg={4}>
+          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={2}>Root Cause Distribution</Typography>
+            <Box sx={{ width: '100%', height: 280 }}>
+              <ResponsiveContainer>
+                <Treemap
+                  data={mockRootCause}
+                  dataKey="size"
+                  stroke="#fff"
+                  fill="#8884d8"
+                  content={<CustomTreemapContent />}
+                >
+                  <RechartsTooltip contentStyle={{ backgroundColor: '#090d16', border: '1px solid rgba(255,255,255,0.1)' }} />
+                </Treemap>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} lg={8}>
+          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={2}>Resource Utilization</Typography>
+            <Box sx={{ width: '100%', height: 280, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-around', alignItems: 'center' }}>
+              {Object.entries(mockResourceUtil).map(([key, value]) => (
+                <Box key={key} display="flex" flexDirection="column" alignItems="center" m={1}>
+                  <RadialBarChart 
+                    width={100} height={100} cx={50} cy={50} innerRadius={35} outerRadius={50} 
+                    barSize={8} data={[{name: key, value, fill: value > 85 ? '#ef4444' : value > 70 ? '#f59e0b' : '#10b981'}]} 
+                    startAngle={90} endAngle={-270}
+                  >
+                    <RadialBar background={{ fill: 'rgba(255,255,255,0.05)' }} clockWise dataKey="value" cornerRadius={10} />
+                    <text x={50} y={55} textAnchor="middle" dominantBaseline="middle" style={{fill: '#fff', fontSize: '14px', fontWeight: 700}}>
+                      {value}%
+                    </text>
+                  </RadialBarChart>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">{key}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
         </Grid>
       </Grid>
 

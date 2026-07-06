@@ -16,6 +16,8 @@ import { haversine } from '@/utils/haversine';
 import { useTheme, palette, radius, space, shadow } from '@/theme';
 import { getSignalMetrics } from 'expo-telephony';
 import { runPingTest, runDownloadTest, runUploadTest } from '@/utils/speedTest';
+import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 
@@ -64,8 +66,15 @@ export default function ActiveScreen() {
   const [mDl, setMDl] = useState('');
   const [mEvent, setMEvent] = useState('');
   const [ending, setEnding] = useState(false);
+  
+  const [pci, setPci] = useState<number | null>(null);
+  const [tac, setTac] = useState<number | null>(null);
+  const [tech, setTech] = useState<string | null>(null);
 
   const [autoSignal, setAutoSignal] = useState(false);
+  
+  const prevRsrp = useRef<number | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   // Speed test states
   const [showSpeedTest, setShowSpeedTest] = useState(false);
@@ -96,6 +105,18 @@ export default function ActiveScreen() {
         if (m.rsrq != null)          setRsrq(m.rsrq);
         if (m.sinr != null)          setSinr(Number(m.sinr.toFixed(1)));
         if (m.dl_throughput != null) setDl(m.dl_throughput);
+        if (m.pci != null)           setPci(m.pci);
+        if (m.tac != null)           setTac(m.tac);
+        if (m.technology != null)    setTech(m.technology);
+
+        // Haptic & Audio Alerts for critical signal drop
+        if (m.rsrp != null && m.rsrp < -110 && (prevRsrp.current == null || prevRsrp.current >= -110)) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          // Just vibrate strongly multiple times for eyes-free testing
+          setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error), 500);
+          setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error), 1000);
+        }
+        prevRsrp.current = m.rsrp ?? null;
       } catch {
         // Module not available in Expo Go — silently ignore
       }
@@ -147,6 +168,7 @@ export default function ActiveScreen() {
             latitude, longitude,
             rsrp: rsrp ?? undefined, rsrq: rsrq ?? undefined,
             sinr: sinr ?? undefined, dl_throughput: dl ?? undefined,
+            pci: pci ?? undefined, band: tech ?? undefined,
           };
           batchRef.current.push(sample);
           addSample(sample);
@@ -326,6 +348,14 @@ export default function ActiveScreen() {
           <Text style={styles.topStatVal}>{session?.samples.length || 0}</Text>
           <Text style={styles.topStatLbl}>SAMPLES</Text>
         </View>
+      </View>
+      
+      {/* Cell Identity Strip */}
+      <View style={[styles.cellStrip, { backgroundColor: palette.primaryDark }]}>
+        <Ionicons name="cellular" size={14} color="rgba(255,255,255,0.7)" />
+        <Text style={styles.cellStripText}>
+          {tech || 'LTE'}  •  {pci != null ? `PCI: ${pci}` : 'PCI: —'}  •  {tac != null ? `TAC: ${tac}` : 'TAC: —'}
+        </Text>
       </View>
 
       {/* KPI gauges */}
@@ -585,6 +615,9 @@ const styles = StyleSheet.create({
   topStatVal: { color: '#fff', fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
   topStatLbl: { color: 'rgba(255,255,255,0.5)', fontSize: 8, letterSpacing: 1, marginTop: 1 },
   topDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.15)' },
+  
+  cellStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 12 },
+  cellStripText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
 
   gaugeBar: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.sm, paddingVertical: space.sm },
   statusStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingVertical: 5, borderBottomWidth: 1 },
