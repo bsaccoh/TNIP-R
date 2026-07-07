@@ -3,7 +3,7 @@
 // NULLIF(a,b), ABS(x), MIN(a,b), MAX(a,b). No eval / Function — recursive descent.
 // Null semantics: any null operand → null (so missing counters skip the KPI).
 
-const FUNCS = new Set(['NULLIF', 'ABS', 'MIN', 'MAX']);
+const FUNCS = new Set(['NULLIF', 'ABS', 'MIN', 'MAX', 'COALESCE']);
 
 function tokenize(expr) {
   const tokens = [];
@@ -89,6 +89,7 @@ function makeParser(tokens, env) {
       case 'ABS': return args[0] == null ? null : Math.abs(args[0]);
       case 'MIN': return args.some((a) => a == null) ? null : Math.min(...args);
       case 'MAX': return args.some((a) => a == null) ? null : Math.max(...args);
+      case 'COALESCE': { const first = args.find((a) => a != null); return first !== undefined ? first : null; }
       default: throw new Error('unreachable');
     }
   }

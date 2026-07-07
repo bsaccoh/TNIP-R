@@ -50,10 +50,15 @@ import ApiIcon from '@mui/icons-material/Api';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import MultilineChartIcon from '@mui/icons-material/MultilineChart';
+import LanIcon from '@mui/icons-material/Lan';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import CellWifiIcon from '@mui/icons-material/CellWifi';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import FeedIcon from '@mui/icons-material/Feed';
 import FactCheckIcon2 from '@mui/icons-material/RuleFolder';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import { useAuth } from '../auth/AuthContext';
 import { useColorMode } from '../theme/ColorMode';
 import NotificationsBell from './NotificationsBell';
@@ -75,25 +80,26 @@ const NAV = [
   { to: '/operator-disputes', label: 'My Disputes',    icon: <BalanceIcon />,            roles: ['OPERATOR_USER'] },
 
   // ── Regulator workspace ──
+  { section: 'Dashboard & Analytics' },
   { to: '/', label: 'National Dashboard', icon: <DashboardIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
-
-  { section: 'Performance' },
   {
     group: 'performance', label: 'KPI & Monitoring', icon: <AnalyticsIcon />,
     children: [
-      { to: '/comparison', label: 'KPI Comparison', icon: <CompareArrowsIcon /> },
       { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
+      { to: '/pm-kpis', label: 'KPI Health Matrix', icon: <MultilineChartIcon /> },
       { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
       { to: '/noc', label: 'NOC Monitoring', icon: <RadarIcon /> },
       { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
     ],
   },
+
+  { section: 'Compliance & Enforcement' },
   {
-    group: 'compliance', label: 'Compliance', icon: <VerifiedIcon />,
+    group: 'compliance', label: 'Compliance & Obligations', icon: <VerifiedIcon />,
     children: [
+      { to: '/compliance', label: 'Compliance Matrix', icon: <VerifiedIcon /> },
       { to: '/sla-dashboard', label: 'SLA Dashboard', icon: <FactCheckIcon2 />, roles: ALL_STAFF, permissions: ['compliance:read'] },
-      { to: '/compliance', label: 'Compliance', icon: <VerifiedIcon /> },
       { to: '/compliance-notices', label: 'Compliance Notices', icon: <GavelIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:read', 'compliance:write'] },
       { to: '/enforcement', label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/operator-disputes', label: 'Disputes', icon: <BalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
@@ -102,16 +108,20 @@ const NAV = [
       { to: '/penalties', label: 'Penalties & Fines', icon: <AccountBalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
     ],
   },
+
+  { section: 'Operators & Complaints' },
   {
-    group: 'operators', label: 'Operators', icon: <BusinessIcon />,
+    group: 'operators', label: 'Operators & QoE', icon: <BusinessIcon />,
     children: [
-      { to: '/operators', label: 'Operators', icon: <BusinessIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:read', 'operators:write'] },
+      { to: '/operators', label: 'Operators List', icon: <BusinessIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:read', 'operators:write'] },
       { to: '/ranking', label: 'Operator Ranking', icon: <EmojiEventsIcon /> },
       { to: '/consumer-qoe', label: 'Consumer QoE', icon: <SentimentVeryDissatisfiedIcon /> },
+      { to: '/complaints', label: 'Complaint Portal', icon: <ReportProblemIcon /> },
+      { to: '/complaint-analytics', label: 'Complaint Analytics', icon: <TimelineIcon /> },
     ],
   },
 
-  { section: 'Network' },
+  { section: 'Network & Testing' },
   {
     group: 'network', label: 'Network & Coverage', icon: <CellTowerIcon />,
     children: [
@@ -119,6 +129,8 @@ const NAV = [
       { to: '/inventory', label: 'Network Inventory', icon: <CellTowerIcon /> },
       { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ALL_STAFF, permissions: ['kpi:read', 'kpi:write'] },
+      { to: '/fiber', label: 'Fiber Monitoring', icon: <LanIcon /> },
+      { to: '/fiber-topology', label: 'Fiber Backbone Map', icon: <AccountTreeIcon /> },
     ],
   },
   {
@@ -132,9 +144,9 @@ const NAV = [
     ],
   },
 
-  { section: 'Data & Reports' },
+  { section: 'System & Admin' },
   {
-    group: 'reports', label: 'Reports', icon: <AssessmentIcon />,
+    group: 'reports', label: 'Reports Management', icon: <AssessmentIcon />,
     children: [
       { to: '/reports', label: 'Reports', icon: <AssessmentIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
       { to: '/report-templates', label: 'Report Templates', icon: <FeedIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
@@ -150,8 +162,6 @@ const NAV = [
     ],
   },
   { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon />, permissions: ['ai:read'] },
-
-  { section: 'Administration' },
   {
     group: 'kpi-config', label: 'KPI Configuration', icon: <FunctionsIcon />,
     children: [
@@ -160,7 +170,7 @@ const NAV = [
     ],
   },
   {
-    group: 'admin', label: 'System', icon: <SettingsIcon />,
+    group: 'admin', label: 'System Admin', icon: <SettingsIcon />,
     children: [
       { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
       { to: '/settings', label: 'General Settings', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },

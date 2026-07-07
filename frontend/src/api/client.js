@@ -63,6 +63,10 @@ export async function put(url, body) {
   const r = await api.put(url, body);
   return r.data;
 }
+export async function patch(url, body) {
+  const r = await api.patch(url, body);
+  return r.data;
+}
 export async function del(url) {
   const r = await api.delete(url);
   return r.data;

@@ -159,6 +159,39 @@ export default function NocMonitoringPage() {
   const [previewStart, setPreviewStart] = useState('');
   const [previewEnd, setPreviewEnd] = useState('');
   const [mapMode, setMapMode] = useState('nodes');
+  const [appliedRange, setAppliedRange] = useState(null);
+
+  const getFilteredData = (data, isExpanded, dateKey = 'time') => {
+    if (!isExpanded || !appliedRange) return data;
+    const { start, end } = appliedRange;
+    const startStr = start.split('T')[1] || '00:00';
+    const endStr = end.split('T')[1] || '23:59';
+    
+    return data.filter(item => {
+      const val = item[dateKey];
+      if (!val || typeof val !== 'string') return true;
+      if (val.includes(':')) {
+        return val >= startStr && val <= endStr;
+      }
+      if (dateKey === 'month') {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const startMonthIdx = new Date(start).getMonth();
+        const endMonthIdx = new Date(end).getMonth();
+        const itemIdx = months.indexOf(val);
+        if (itemIdx === -1) return true;
+        return itemIdx >= startMonthIdx && itemIdx <= endMonthIdx;
+      }
+      if (dateKey === 'date') {
+        const dayMap = { '1st': 1, '8th': 8, '15th': 15, '22nd': 22, '29th': 29 };
+        const startDay = new Date(start).getDate();
+        const endDay = new Date(end).getDate();
+        const dayVal = dayMap[val];
+        if (!dayVal) return true;
+        return dayVal >= startDay && dayVal <= endDay;
+      }
+      return true;
+    });
+  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -182,10 +215,10 @@ export default function NocMonitoringPage() {
   // ── Render Functions for Charts ──
 
   // --- Network Inventory ---
-  const renderMonthlyPerformance = (height) => (
+  const renderMonthlyPerformance = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <LineChart data={mockMonthlyPerformance} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <LineChart data={getFilteredData(mockMonthlyPerformance, isExpanded, 'month')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['auto', 100]} />
@@ -311,10 +344,10 @@ export default function NocMonitoringPage() {
     </Box>
   );
 
-  const renderCounterGrowth = (height) => (
+  const renderCounterGrowth = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <ComposedChart data={mockCounterGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <ComposedChart data={getFilteredData(mockCounterGrowth, isExpanded, 'date')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
@@ -329,10 +362,10 @@ export default function NocMonitoringPage() {
   );
 
   // --- Advanced KPIs ---
-  const renderThroughputTrend = (height) => (
+  const renderThroughputTrend = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <AreaChart data={mockThroughputTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={getFilteredData(mockThroughputTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
@@ -345,10 +378,10 @@ export default function NocMonitoringPage() {
     </Box>
   );
 
-  const renderCssrTrend = (height) => (
+  const renderCssrTrend = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <LineChart data={mockCssrTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <LineChart data={getFilteredData(mockCssrTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['dataMin - 1', 100]} />
@@ -380,10 +413,10 @@ export default function NocMonitoringPage() {
     </Box>
   );
 
-  const renderOutagesChart = (height) => (
+  const renderOutagesChart = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <AreaChart data={mockOutages} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={getFilteredData(mockOutages, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
@@ -447,10 +480,10 @@ export default function NocMonitoringPage() {
     </Box>
   );
 
-  const renderDcrTrendChart = (height) => (
+  const renderDcrTrendChart = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <LineChart data={mockDcrTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <LineChart data={getFilteredData(mockDcrTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
@@ -464,10 +497,10 @@ export default function NocMonitoringPage() {
     </Box>
   );
 
-  const renderTrafficChart = (height) => (
+  const renderTrafficChart = (height, isExpanded = false) => (
     <Box sx={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <ComposedChart data={mockTraffic} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <ComposedChart data={getFilteredData(mockTraffic, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
           <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
@@ -779,7 +812,7 @@ export default function NocMonitoringPage() {
 
       {/* SINGLE VIEW MODAL */}
       <Dialog 
-        open={Boolean(expandedChart)} onClose={() => setExpandedChart(null)} maxWidth="lg" fullWidth
+        open={Boolean(expandedChart)} onClose={() => { setExpandedChart(null); setAppliedRange(null); setPreviewStart(''); setPreviewEnd(''); }} maxWidth="lg" fullWidth
         PaperProps={{ sx: { bgcolor: 'background.paper', borderRadius: 2, backgroundImage: 'none' } }}
       >
         {expandedChart && (
@@ -797,17 +830,17 @@ export default function NocMonitoringPage() {
                 />
                 <Button 
                   variant="contained" size="small" disabled={!previewStart || !previewEnd} sx={{ height: 40 }}
-                  onClick={() => console.log('Searching preview range:', previewStart, 'to', previewEnd)}
+                  onClick={() => setAppliedRange({ start: previewStart, end: previewEnd })}
                 >
                   Search
                 </Button>
-                <IconButton onClick={() => setExpandedChart(null)} sx={{ color: 'text.secondary', ml: 1 }}>
+                <IconButton onClick={() => { setExpandedChart(null); setAppliedRange(null); setPreviewStart(''); setPreviewEnd(''); }} sx={{ color: 'text.secondary', ml: 1 }}>
                   <CloseIcon />
                 </IconButton>
               </Box>
             </DialogTitle>
             <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.05)', p: 4, bgcolor: '#0a0e1a' }}>
-              {expandedChart.renderFn(600)}
+              {expandedChart.renderFn(600, true)}
             </DialogContent>
           </>
         )}

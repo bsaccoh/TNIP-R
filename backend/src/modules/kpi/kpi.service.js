@@ -2,8 +2,6 @@ import { pool, query } from '../../config/db.js';
 import { logger } from '../../config/logger.js';
 import { evaluateFormula, extractCounterKeys, validateFormula } from './formulaEvaluator.js';
 
-const HUAWEI_VENDOR_ID = 1;
-
 /** Pick the aggregated value matching a counter's aggregation method. */
 function pickAgg(row) {
   switch (row.aggregation) {
@@ -15,7 +13,7 @@ function pickAgg(row) {
   }
 }
 
-async function loadActiveFormulas(operatorId, technologyId) {
+async function loadActiveFormulas(operatorId, technologyId, vendorId) {
   const rows = await query(
     `SELECT f.formula_id, f.kpi_id, f.expression, k.kpi_key, k.name
        FROM kpi_formulas f JOIN kpi_definitions k ON k.kpi_id = f.kpi_id
@@ -23,7 +21,7 @@ async function loadActiveFormulas(operatorId, technologyId) {
         AND (f.vendor_id = :v OR f.vendor_id IS NULL)
         AND (f.technology_id = :t OR f.technology_id IS NULL)
         AND (f.operator_id = :op OR f.operator_id IS NULL)`,
-    { v: HUAWEI_VENDOR_ID, t: technologyId, op: operatorId }
+    { v: vendorId ?? null, t: technologyId, op: operatorId }
   );
   return rows.map((r) => ({ ...r, counterKeys: extractCounterKeys(r.expression) }));
 }
@@ -33,10 +31,11 @@ async function loadActiveFormulas(operatorId, technologyId) {
  * unavailable (graceful) and stores results in calculated_kpis.
  */
 export async function calculateForFile(pmFileId, operatorId) {
-  // Use the file's actual technology so 3G/2G/4G/5G formulas all resolve.
-  const fileRow = (await query('SELECT technology_id FROM pm_files WHERE pm_file_id = :id', { id: pmFileId }))[0];
+  // Use the file's actual technology and vendor so formulas resolve correctly per vendor.
+  const fileRow = (await query('SELECT technology_id, vendor_id FROM pm_files WHERE pm_file_id = :id', { id: pmFileId }))[0];
   const technologyId = fileRow?.technology_id ?? 3;
-  const formulas = await loadActiveFormulas(operatorId, technologyId);
+  const vendorId = fileRow?.vendor_id ?? null;
+  const formulas = await loadActiveFormulas(operatorId, technologyId, vendorId);
   if (!formulas.length) return { kpisCalculated: 0, message: 'No active formulas for technology' };
 
   // Aggregate counter values per cell per day.
@@ -171,6 +170,71 @@ export async function kpiDistribution(kpiKey, operatorId) {
       ORDER BY ck.value`,
     { kpi: kpiKey, op: operatorId }
   );
+}
+
+const TECH_ID = { '2G': 1, '3G': 2, '4G': 3, '5G': 4 };
+
+/**
+ * PM KPI time-series for all operators, grouped by KPI key, filtered by technology.
+ * Returns one entry per KPI with per-operator series arrays for multi-line charts.
+ * Pass operatorId to scope to a single operator (optional).
+ */
+export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
+  const technologyId = TECH_ID[technology?.toUpperCase()] ?? null;
+  const opFilter = operatorId ? 'AND ck.operator_id = :op' : '';
+
+  const series = await query(
+    `SELECT o.operator_id, o.operator_name,
+            k.kpi_key, k.name AS kpi_name, k.unit,
+            DATE(ck.ts) AS day, ROUND(AVG(ck.value), 4) AS value
+       FROM calculated_kpis ck
+       JOIN kpi_definitions k ON k.kpi_id = ck.kpi_id
+       JOIN operators o ON o.operator_id = ck.operator_id
+      WHERE ck.granularity = 'DAY'
+        ${opFilter}
+        ${technologyId ? 'AND ck.technology_id = :tid' : ''}
+        ${from ? 'AND ck.ts >= :from' : ''}
+        ${to ? 'AND ck.ts <= :to' : ''}
+      GROUP BY o.operator_id, o.operator_name, k.kpi_key, k.name, k.unit, DATE(ck.ts)
+      ORDER BY k.kpi_key, o.operator_name, day`,
+    {
+      ...(operatorId ? { op: operatorId } : {}),
+      ...(technologyId ? { tid: technologyId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    }
+  );
+
+  const thresholds = await query(
+    `SELECT k.kpi_key, qt.required_value, qt.comparator
+       FROM qos_thresholds qt
+       JOIN kpi_definitions k ON k.kpi_id = qt.kpi_id
+      WHERE qt.is_active = 1
+        ${technologyId ? 'AND (qt.technology_id = :tid OR qt.technology_id IS NULL)' : ''}
+      GROUP BY k.kpi_key, qt.required_value, qt.comparator`,
+    { ...(technologyId ? { tid: technologyId } : {}) }
+  );
+
+  const threshMap = Object.fromEntries(thresholds.map((t) => [t.kpi_key, t]));
+
+  // Group: kpi_key → { meta, operators: { op_id → { meta, series[] } } }
+  const kpiMap = {};
+  for (const row of series) {
+    if (!kpiMap[row.kpi_key]) {
+      kpiMap[row.kpi_key] = { kpi_key: row.kpi_key, kpi_name: row.kpi_name, unit: row.unit, operators: {} };
+    }
+    const ops = kpiMap[row.kpi_key].operators;
+    if (!ops[row.operator_id]) {
+      ops[row.operator_id] = { operator_id: row.operator_id, operator_name: row.operator_name, series: [] };
+    }
+    ops[row.operator_id].series.push({ day: String(row.day).slice(0, 10), value: Number(row.value) });
+  }
+
+  return Object.values(kpiMap).map((kpi) => ({
+    ...kpi,
+    operators: Object.values(kpi.operators),
+    threshold: threshMap[kpi.kpi_key] ?? null,
+  }));
 }
 
 export async function listDefinitions() {

@@ -33,6 +33,9 @@ import predictiveRoutes from '../modules/analytics/predictive.routes.js';
 import spectrumRoutes from '../modules/spectrum/spectrum.routes.js';
 import fieldRoutes from '../modules/field/field.routes.js';
 import slaRoutes from '../modules/sla/sla.routes.js';
+import fiberRoutes from '../modules/fiber/fiber.routes.js';
+import complaintsRoutes from '../modules/complaints/complaints.routes.js';
+import complaintAnalyticsRoutes from '../modules/complaint-analytics/complaint-analytics.routes.js';
 
 const router = Router();
 
@@ -72,5 +75,8 @@ router.use('/predictive', predictiveRoutes);
 router.use('/spectrum', spectrumRoutes);
 router.use('/field', fieldRoutes);
 router.use('/sla', slaRoutes);
+router.use('/fiber', fiberRoutes);
+router.use('/complaints', complaintsRoutes);
+router.use('/complaint-analytics', complaintAnalyticsRoutes);
 
 export default router;

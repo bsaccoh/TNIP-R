@@ -19,6 +19,17 @@ router.get('/analytics', c.analyticsController);
 router.get('/timeseries', operatorScope, c.timeSeriesController);
 router.post('/validate', canWrite, c.validateController);
 router.post('/recalculate', canWrite, c.recalcController);
+router.get('/pm-timeseries', operatorScope, asyncHandler(async (req, res) => {
+  // null = all operators (allowed for regulators); OPERATOR_USER is scoped by middleware
+  const operatorId = req.scope?.operatorId ?? null;
+  return ok(res, await service.pmKpiTimeSeries({
+    operatorId,
+    technology: req.query.technology,
+    from: req.query.from,
+    to: req.query.to,
+  }));
+}));
+
 router.get('/forecast', asyncHandler(async (req, res) => {
   const { operatorId, kpiId, days } = req.query;
   if (!operatorId || !kpiId) throw ApiError.badRequest('operatorId and kpiId are required');

@@ -4,7 +4,6 @@ import { useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import KpiComparison from './pages/KpiComparison';
 import Compliance from './pages/Compliance';
 import Ranking from './pages/Ranking';
 import CoverageMap from './pages/CoverageMap';
@@ -16,6 +15,7 @@ import NocMonitoringPage from './pages/NocMonitoringPage';
 import CounterDictionary from './pages/CounterDictionary';
 import KpiBuilder from './pages/KpiBuilder';
 import KpiAnalytics from './pages/KpiAnalytics';
+import PmKpiDashboard from './pages/PmKpiDashboard';
 import Reports from './pages/Reports';
 import DriveTest from './pages/DriveTest';
 import DriveTestAnalytics from './pages/DriveTestAnalytics';
@@ -46,6 +46,10 @@ import SpectrumManagement from './pages/SpectrumManagement';
 import FieldApp from './pages/FieldApp';
 import ReportTemplates from './pages/ReportTemplates';
 import SlaDashboard from './pages/SlaDashboard';
+import FiberDashboard from './pages/FiberDashboard';
+import FiberTopologyMap from './pages/FiberTopologyMap';
+import ComplaintPortal from './pages/ComplaintPortal';
+import ComplaintAnalytics from './pages/ComplaintAnalytics';
 import RoleGuard from './components/RoleGuard';
 
 function Protected({ children }) {
@@ -76,7 +80,6 @@ function AppRoutes() {
         element={<Protected><Layout /></Protected>}
       >
         <Route index element={<HomeRedirect />} />
-        <Route path="comparison" element={<KpiComparison />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="ranking" element={<Ranking />} />
         <Route path="map" element={<CoverageMap />} />
@@ -87,6 +90,7 @@ function AppRoutes() {
         <Route path="counters" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['kpi:read']}><CounterDictionary /></RoleGuard>} />
         <Route path="kpis" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['kpi:write']}><KpiBuilder /></RoleGuard>} />
         <Route path="analytics" element={<KpiAnalytics />} />
+        <Route path="pm-kpis" element={<PmKpiDashboard />} />
         <Route path="noc" element={<NocMonitoringPage />} />
         <Route path="reports" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><Reports /></RoleGuard>} />
         <Route path="drive-test" element={<DriveTest />} />
@@ -114,7 +118,11 @@ function AppRoutes() {
         <Route path="predictive" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><PredictiveAnalytics /></RoleGuard>} />
         <Route path="spectrum" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SpectrumManagement /></RoleGuard>} />
         <Route path="report-templates" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><ReportTemplates /></RoleGuard>} />
+        <Route path="fiber" element={<FiberDashboard />} />
+        <Route path="fiber-topology" element={<FiberTopologyMap />} />
         <Route path="sla-dashboard" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SlaDashboard /></RoleGuard>} />
+        <Route path="complaints" element={<ComplaintPortal />} />
+        <Route path="complaint-analytics" element={<ComplaintAnalytics />} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
