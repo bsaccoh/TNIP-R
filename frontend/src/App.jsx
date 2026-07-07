@@ -47,7 +47,6 @@ import FieldApp from './pages/FieldApp';
 import ReportTemplates from './pages/ReportTemplates';
 import SlaDashboard from './pages/SlaDashboard';
 import FiberDashboard from './pages/FiberDashboard';
-import FiberTopologyMap from './pages/FiberTopologyMap';
 import ComplaintPortal from './pages/ComplaintPortal';
 import ComplaintAnalytics from './pages/ComplaintAnalytics';
 import RoleGuard from './components/RoleGuard';
@@ -119,7 +118,6 @@ function AppRoutes() {
         <Route path="spectrum" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SpectrumManagement /></RoleGuard>} />
         <Route path="report-templates" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['reports:read']}><ReportTemplates /></RoleGuard>} />
         <Route path="fiber" element={<FiberDashboard />} />
-        <Route path="fiber-topology" element={<FiberTopologyMap />} />
         <Route path="sla-dashboard" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SlaDashboard /></RoleGuard>} />
         <Route path="complaints" element={<ComplaintPortal />} />
         <Route path="complaint-analytics" element={<ComplaintAnalytics />} />

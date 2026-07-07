@@ -130,7 +130,6 @@ const NAV = [
       { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ALL_STAFF, permissions: ['kpi:read', 'kpi:write'] },
       { to: '/fiber', label: 'Fiber Monitoring', icon: <LanIcon /> },
-      { to: '/fiber-topology', label: 'Fiber Backbone Map', icon: <AccountTreeIcon /> },
     ],
   },
   {
