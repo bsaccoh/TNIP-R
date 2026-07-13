@@ -82,20 +82,102 @@ const NAV = [
   // ── Regulator workspace ──
   { section: 'Dashboard & Analytics' },
   { to: '/', label: 'National Dashboard', icon: <DashboardIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
-  { to: '/pm-kpis', label: 'KPI Health Matrix', icon: <MultilineChartIcon /> },
-  { to: '/complaints', label: 'Complaint Portal', icon: <ReportProblemIcon /> },
+  {
+    group: 'performance', label: 'KPI & Monitoring', icon: <AnalyticsIcon />,
+    children: [
+      { to: '/analytics', label: 'KPI Analytics', icon: <AnalyticsIcon /> },
+      { to: '/pm-kpis', label: 'KPI Health Matrix', icon: <MultilineChartIcon /> },
+      { to: '/predictive', label: 'Predictive Analytics', icon: <TrendingUpIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/realtime', label: 'Live Monitor', icon: <WifiTetheringIcon /> },
+      { to: '/noc', label: 'NOC Monitoring', icon: <RadarIcon /> },
+      { to: '/anomalies', label: 'Anomaly Detection', icon: <RadarIcon /> },
+    ],
+  },
 
   { section: 'Compliance & Enforcement' },
-  { to: '/compliance', label: 'Compliance Matrix', icon: <VerifiedIcon /> },
-  { to: '/enforcement', label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+  {
+    group: 'compliance', label: 'Compliance & Obligations', icon: <VerifiedIcon />,
+    children: [
+      { to: '/compliance', label: 'Compliance Matrix', icon: <VerifiedIcon /> },
+      { to: '/sla-dashboard', label: 'SLA Dashboard', icon: <FactCheckIcon2 />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/compliance-notices', label: 'Compliance Notices', icon: <GavelIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:read', 'compliance:write'] },
+      { to: '/enforcement', label: 'Enforcement Cases', icon: <SecurityIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/operator-disputes', label: 'Disputes', icon: <BalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/submission-cycles', label: 'Submission Cycles', icon: <AssignmentTurnedInIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/obligations', label: 'License Obligations', icon: <FactCheckIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/penalties', label: 'Penalties & Fines', icon: <AccountBalanceIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+    ],
+  },
+
+  { section: 'Operators & Complaints' },
+  {
+    group: 'operators', label: 'Operators & QoE', icon: <BusinessIcon />,
+    children: [
+      { to: '/operators', label: 'Operators List', icon: <BusinessIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['operators:read', 'operators:write'] },
+      { to: '/ranking', label: 'Operator Ranking', icon: <EmojiEventsIcon /> },
+      { to: '/consumer-qoe', label: 'Consumer QoE', icon: <SentimentVeryDissatisfiedIcon /> },
+      { to: '/complaints', label: 'Complaint Portal', icon: <ReportProblemIcon /> },
+      { to: '/complaint-analytics', label: 'Complaint Analytics', icon: <TimelineIcon /> },
+    ],
+  },
 
   { section: 'Network & Testing' },
-  { to: '/map', label: 'Coverage Map', icon: <MapIcon /> },
-  { to: '/drive-test', label: 'Drive Tests', icon: <RouteIcon /> },
+  {
+    group: 'network', label: 'Network & Coverage', icon: <CellTowerIcon />,
+    children: [
+      { to: '/map', label: 'Coverage Map', icon: <MapIcon /> },
+      { to: '/regional-coverage', label: 'Regional Coverage', icon: <MapIcon /> },
+      { to: '/inventory', label: 'Network Inventory', icon: <CellTowerIcon /> },
+      { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
+      { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ALL_STAFF, permissions: ['kpi:read', 'kpi:write'] },
+      { to: '/fiber', label: 'Fiber Monitoring', icon: <LanIcon /> },
+    ],
+  },
+  {
+    group: 'drive-test', label: 'Drive Testing', icon: <RouteIcon />,
+    children: [
+      { to: '/drive-test', label: 'Drive Tests', icon: <RouteIcon /> },
+      { to: '/drive-test-campaigns', label: 'Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
+      { to: '/field', label: 'Field App', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
+      { to: '/drive-test-analytics', label: 'DT Analytics', icon: <QueryStatsIcon /> },
+      { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
+    ],
+  },
 
   { section: 'System & Admin' },
-  { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
-  { to: '/settings', label: 'General Settings', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+  {
+    group: 'reports', label: 'Reports Management', icon: <AssessmentIcon />,
+    children: [
+      { to: '/reports', label: 'Reports', icon: <AssessmentIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
+      { to: '/report-templates', label: 'Report Templates', icon: <FeedIcon />, roles: ALL_STAFF, permissions: ['reports:read'] },
+      { to: '/scheduled-reports', label: 'Scheduled Reports', icon: <ScheduleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['reports:read'] },
+    ],
+  },
+  {
+    group: 'data', label: 'Data & Integration', icon: <UploadFileIcon />,
+    children: [
+      { to: '/ingestion', label: 'Data Ingestion', icon: <UploadFileIcon />, permissions: ['ingestion:write'], roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/data-quality', label: 'Data Quality', icon: <VerifiedUserIcon /> },
+      { to: '/api-gateway', label: 'API Gateway', icon: <ApiIcon /> },
+    ],
+  },
+  { to: '/assistant', label: 'AI Assistant', icon: <SmartToyIcon />, permissions: ['ai:read'] },
+  {
+    group: 'kpi-config', label: 'KPI Configuration', icon: <FunctionsIcon />,
+    children: [
+      { to: '/kpis', label: 'KPI Builder', icon: <FunctionsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['kpi:write'] },
+      { to: '/thresholds', label: 'KPI Thresholds', icon: <TuneIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['compliance:write'] },
+    ],
+  },
+  {
+    group: 'admin', label: 'System Admin', icon: <SettingsIcon />,
+    children: [
+      { to: '/users', label: 'User Management', icon: <PeopleIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'], permissions: ['users:write'] },
+      { to: '/settings', label: 'General Settings', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/licenses', label: 'License Management', icon: <CardMembershipIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+      { to: '/audit-log', label: 'Audit Log', icon: <HistoryIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
+    ],
+  },
 ];
 
 function canAccess(item, user) {
