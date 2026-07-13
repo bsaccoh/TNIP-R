@@ -23,33 +23,16 @@ const OP_COLORS = {
   'Sierra Tel': '#1A3C8F',  // Primary Blue
 };
 
-// 25 KPIs list as specified in the prompt screenshot
+// Essential Core SLA KPIs for optimized performance
 const KPI_DEFS = [
   { key: 'cell_avail', name: 'Cell Availability', unit: '%', isHigherBetter: true, target: 99.0, category: 'Accessibility' },
   { key: 'call_setup_sr', name: 'Call Setup Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Accessibility' },
   { key: 'call_drop_rate', name: 'Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Retainability' },
-  { key: 'voice_setup_sr', name: 'Voice Call Setup Success Rate', unit: '%', isHigherBetter: true, target: 98.5, category: 'Accessibility' },
-  { key: 'voice_call_sr', name: 'Voice Call Success Rate', unit: '%', isHigherBetter: true, target: 97.5, category: 'Accessibility' },
-  { key: 'voice_drop_rate', name: 'Voice Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.2, category: 'Retainability' },
   { key: 'data_access_sr', name: 'Data Access Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Accessibility' },
   { key: 'data_drop_rate', name: 'Data Drop Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Retainability' },
-  { key: 'dl_hs_throughput', name: 'DL HS Throughput (Kbps)', unit: 'Kbps', isHigherBetter: true, target: 2048, category: 'Throughput' },
   { key: 'dl_speed', name: 'DL Speed (Mbps)', unit: 'Mbps', isHigherBetter: true, target: 10.0, category: 'Throughput' },
-  { key: 'data_service_access_sr', name: 'Data Service Access Success Rate', unit: '%', isHigherBetter: true, target: 98.5, category: 'Accessibility' },
-  { key: 'data_service_drop_rate', name: 'Data Service Drop Rate', unit: '%', isHigherBetter: false, target: 1.8, category: 'Retainability' },
-  { key: 'handover_sr', name: 'Handover Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Mobility' },
-  { key: 'handover_fr', name: 'Handover Failure Rate', unit: '%', isHigherBetter: false, target: 2.0, category: 'Mobility' },
-  { key: 'sdcch_congestion', name: 'SDCCH Congestion Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Congestion' },
-  { key: 'sdcch_drop', name: 'SDCCH Drop Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Retainability' },
-  { key: 'tch_congestion', name: 'TCH Congestion Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Congestion' },
-  { key: 'random_access_sr', name: 'Random Access Success Rate', unit: '%', isHigherBetter: true, target: 95.0, category: 'Accessibility' },
-  { key: 'imm_assign_sr', name: 'Immediate Assignment Success Rate', unit: '%', isHigherBetter: true, target: 96.0, category: 'Accessibility' },
-  { key: 'tch_traffic', name: 'TCH Traffic (Erlang)', unit: 'Erl', isHigherBetter: true, target: 150.0, category: 'Traffic' },
-  { key: 'amr_drop_rate', name: 'AMR Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Retainability' },
-  { key: 'ul_data_throughput', name: 'UL Data Throughput (Kbps)', unit: 'Kbps', isHigherBetter: true, target: 1024, category: 'Throughput' },
   { key: 'ul_speed', name: 'UL Speed (Mbps)', unit: 'Mbps', isHigherBetter: true, target: 4.0, category: 'Throughput' },
-  { key: 'tbf_est_attempts', name: 'TBF Establishment Attempts', unit: 'cnt', isHigherBetter: true, target: 10000, category: 'Traffic' },
-  { key: 'pdch_util', name: 'PDCH Utilization', unit: '%', isHigherBetter: true, target: 45.0, category: 'Traffic' },
+  { key: 'handover_sr', name: 'Handover Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Mobility' },
 ];
 
 // Helper to generate seed mock data across date range
