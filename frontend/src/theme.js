@@ -1,14 +1,28 @@
 import { createTheme } from '@mui/material/styles';
 
-// Operator brand colours — retained because they encode data (per-operator series).
+// Canonical operator brand colours — single source of truth for the whole app.
 export const OPERATOR_COLORS = {
-  Orange: '#ea6a1e',
-  Africell: '#7b3fa0',
-  Qcell: '#5b2d8e',
-  SierraTel: '#0284c7',
+  Orange:    '#ff7900',
+  Africell:  '#8e24aa',
+  Qcell:     '#5b2d8e',
+  SierraTel: '#00a3e0',
 };
+
+// Generic fallback palette for charts when operator name is unknown.
+export const OP_FALLBACK_PALETTE = ['#2563eb', '#0891b2', '#16a34a', '#dc2626', '#7c3aed', '#14b8a6'];
+
+/** Exact-match first, then index fallback. */
 export const colorFor = (name, i = 0) =>
-  OPERATOR_COLORS[name] || ['#2563eb', '#0891b2', '#16a34a', '#dc2626', '#7c3aed'][i % 5];
+  OPERATOR_COLORS[name] || OP_FALLBACK_PALETTE[i % OP_FALLBACK_PALETTE.length];
+
+/** Fuzzy-match operator name → brand color (handles "Orange SL", "africell" etc.). */
+export function opColor(name) {
+  if (!name) return '#1565c0';
+  for (const [k, v] of Object.entries(OPERATOR_COLORS)) {
+    if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  }
+  return '#1565c0';
+}
 
 export const STATUS_COLOR = { PASS: '#16a34a', WARNING: '#d97706', FAIL: '#dc2626' };
 

@@ -419,7 +419,7 @@ export default function CoverageMap() {
                           <strong>{s.site_code}</strong><br />
                           <span style={{ fontSize: 12 }}>{s.site_name}</span><br />
                           <span style={{ fontSize: 11, color: '#888' }}>
-                            {s.region || 'Unknown Region'} &middot; {s.technologies}
+                            {operators.find(o => o.operator_id === s.operator_id)?.operator_name || 'Unknown Operator'} &middot; {s.region || 'Unknown Region'} &middot; {s.technologies}
                           </span><br />
                           <span style={{ fontSize: 11 }}>Status: <b>{s.status || 'ACTIVE'}</b></span><br />
                           <span style={{ fontSize: 11, color: '#666' }}>
@@ -469,7 +469,7 @@ export default function CoverageMap() {
                         <strong>{c.cell_code}</strong><br />
                         <span style={{ fontSize: 12 }}>{c.cell_name}</span><br />
                         <span style={{ fontSize: 11, color: '#888' }}>
-                          Site: {c.site_code} &middot; {c.tech_key}
+                          {operators.find(o => o.operator_id === c.operator_id)?.operator_name || 'Unknown Operator'} &middot; Site: {c.site_code} &middot; {c.tech_key}
                         </span><br />
                         <span style={{ fontSize: 11, color: '#666' }}>
                           {Number(c.latitude).toFixed(5)}, {Number(c.longitude).toFixed(5)}

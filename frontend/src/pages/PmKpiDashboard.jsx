@@ -1,254 +1,596 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import {
-  Box, Card, CardContent, Chip, FormControl, Grid, InputLabel,
-  MenuItem, Select, Stack, TextField, Typography, useTheme,
+  Box, Paper, Card, CardContent, FormControl, Grid, InputLabel,
+  MenuItem, Select, OutlinedInput, Checkbox, ListItemText, Stack, TextField,
+  Typography, useTheme, Table, TableHead, TableBody, TableRow, TableCell,
+  TableContainer, ToggleButton, ToggleButtonGroup, InputAdornment, Divider, Chip
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import MultilineChartIcon from '@mui/icons-material/MultilineChart';
+import SearchIcon from '@mui/icons-material/Search';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, Legend,
+  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine, CartesianGrid, Legend, PieChart, Pie
 } from 'recharts';
-import { get } from '../api/client';
-import { Loading, EmptyState } from '../components/ui';
+import PageHeader from '../components/PageHeader';
+import { useChartTip } from '../components/ui';
 
-const TECH_TABS = ['2G', '3G', '4G'];
-
-const TECH_KPIS = {
-  '2G': ['CELL_AVAILABILITY', 'CSSR', 'CALL_SUCCESS_RATE', 'CALL_DROP_RATE'],
-  '3G': ['CELL_AVAILABILITY', 'VOICE_CALL_SETUP_SSR', 'VOICE_CALL_SSR', 'VOICE_CALL_DROP_RATE', 'DATA_ACCESS_SSR', 'DATA_DROP_RATE_3G', 'DL_HS_THROUGHPUT'],
-  '4G': ['CELL_AVAILABILITY', 'DATA_SERVICE_ACCESS_SSR', 'DATA_SERVICE_DROP_RATE', 'DL_SPEED_MBPS'],
+// Palette matching exactly the rest of the application
+const OP_COLORS = {
+  'Orange': '#F5A623',     // Orange
+  'Africell': '#7B1FA2',   // Purple
+  'Qcell': '#E53935',      // Red
+  'Sierra Tel': '#1A3C8F',  // Primary Blue
 };
 
-const OP_COLORS = ['#4c8ef7', '#f97316', '#22c55e', '#a855f7', '#ef4444', '#14b8a6'];
+// 25 KPIs list as specified in the prompt screenshot
+const KPI_DEFS = [
+  { key: 'cell_avail', name: 'Cell Availability', unit: '%', isHigherBetter: true, target: 99.0, category: 'Accessibility' },
+  { key: 'call_setup_sr', name: 'Call Setup Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Accessibility' },
+  { key: 'call_drop_rate', name: 'Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Retainability' },
+  { key: 'voice_setup_sr', name: 'Voice Call Setup Success Rate', unit: '%', isHigherBetter: true, target: 98.5, category: 'Accessibility' },
+  { key: 'voice_call_sr', name: 'Voice Call Success Rate', unit: '%', isHigherBetter: true, target: 97.5, category: 'Accessibility' },
+  { key: 'voice_drop_rate', name: 'Voice Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.2, category: 'Retainability' },
+  { key: 'data_access_sr', name: 'Data Access Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Accessibility' },
+  { key: 'data_drop_rate', name: 'Data Drop Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Retainability' },
+  { key: 'dl_hs_throughput', name: 'DL HS Throughput (Kbps)', unit: 'Kbps', isHigherBetter: true, target: 2048, category: 'Throughput' },
+  { key: 'dl_speed', name: 'DL Speed (Mbps)', unit: 'Mbps', isHigherBetter: true, target: 10.0, category: 'Throughput' },
+  { key: 'data_service_access_sr', name: 'Data Service Access Success Rate', unit: '%', isHigherBetter: true, target: 98.5, category: 'Accessibility' },
+  { key: 'data_service_drop_rate', name: 'Data Service Drop Rate', unit: '%', isHigherBetter: false, target: 1.8, category: 'Retainability' },
+  { key: 'handover_sr', name: 'Handover Success Rate', unit: '%', isHigherBetter: true, target: 98.0, category: 'Mobility' },
+  { key: 'handover_fr', name: 'Handover Failure Rate', unit: '%', isHigherBetter: false, target: 2.0, category: 'Mobility' },
+  { key: 'sdcch_congestion', name: 'SDCCH Congestion Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Congestion' },
+  { key: 'sdcch_drop', name: 'SDCCH Drop Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Retainability' },
+  { key: 'tch_congestion', name: 'TCH Congestion Rate', unit: '%', isHigherBetter: false, target: 1.5, category: 'Congestion' },
+  { key: 'random_access_sr', name: 'Random Access Success Rate', unit: '%', isHigherBetter: true, target: 95.0, category: 'Accessibility' },
+  { key: 'imm_assign_sr', name: 'Immediate Assignment Success Rate', unit: '%', isHigherBetter: true, target: 96.0, category: 'Accessibility' },
+  { key: 'tch_traffic', name: 'TCH Traffic (Erlang)', unit: 'Erl', isHigherBetter: true, target: 150.0, category: 'Traffic' },
+  { key: 'amr_drop_rate', name: 'AMR Call Drop Rate', unit: '%', isHigherBetter: false, target: 1.0, category: 'Retainability' },
+  { key: 'ul_data_throughput', name: 'UL Data Throughput (Kbps)', unit: 'Kbps', isHigherBetter: true, target: 1024, category: 'Throughput' },
+  { key: 'ul_speed', name: 'UL Speed (Mbps)', unit: 'Mbps', isHigherBetter: true, target: 4.0, category: 'Throughput' },
+  { key: 'tbf_est_attempts', name: 'TBF Establishment Attempts', unit: 'cnt', isHigherBetter: true, target: 10000, category: 'Traffic' },
+  { key: 'pdch_util', name: 'PDCH Utilization', unit: '%', isHigherBetter: true, target: 45.0, category: 'Traffic' },
+];
 
-function toDateStr(d) {
-  return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
-}
+// Helper to generate seed mock data across date range
+const generateMockKPIs = () => {
+  const dataset = [];
+  const operators = ['Orange', 'Africell', 'Qcell', 'Sierra Tel'];
+  const techs = ['2G', '3G', '4G', '5G'];
+  
+  // Date loop: June 1st to July 15th 2026
+  const start = new Date('2026-06-01');
+  const end = new Date('2026-07-15');
 
-function defaultDates() {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 30);
-  return { from: toDateStr(from), to: toDateStr(to) };
-}
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    operators.forEach((op, opIdx) => {
+      techs.forEach((tech, techIdx) => {
+        // Base modifiers for variance between operators and tech
+        const opMod = op === 'Orange' ? 1.02 : op === 'Africell' ? 0.99 : op === 'Sierra Tel' ? 0.96 : 0.94;
+        const techMod = tech === '5G' ? 1.20 : tech === '4G' ? 1.08 : tech === '3G' ? 0.94 : 0.82;
 
-function getStatus(value, threshold) {
-  if (!threshold || value == null) return 'N/A';
-  const req = Number(threshold.required_value);
-  if (threshold.comparator === '>=' || threshold.comparator === '>') {
-    if (value >= req) return 'PASS';
-    if (value >= req * 0.95) return 'WARN';
-    return 'FAIL';
+        KPI_DEFS.forEach((kpi) => {
+          // Semi-random values with sin-wave offset for natural-looking lines
+          const sinOffset = Math.sin((d.getDate() + opIdx + techIdx) * 0.4) * 1.5;
+          let value;
+          
+          if (kpi.unit === '%') {
+            if (kpi.isHigherBetter) {
+              value = (kpi.target - 2.5) * opMod * techMod + sinOffset + (Math.random() * 2);
+              value = Math.min(100.0, Math.max(0.0, value));
+            } else {
+              value = (kpi.target + 0.8) / (opMod * techMod) + sinOffset * 0.2 + (Math.random() * 0.5);
+              value = Math.max(0.0, value);
+            }
+          } else if (kpi.unit === 'Kbps' || kpi.unit === 'Erl' || kpi.unit === 'cnt') {
+            value = kpi.target * opMod * techMod + sinOffset * 50 + (Math.random() * 200);
+          } else { // Mbps
+            value = kpi.target * opMod * techMod + sinOffset * 0.8 + (Math.random() * 2.0);
+            value = Math.max(0.2, value);
+          }
+
+          dataset.push({
+            date: dateStr,
+            operator: op,
+            technology: tech,
+            kpi_key: kpi.key,
+            value: Number(value.toFixed(2))
+          });
+        });
+      });
+    });
   }
-  if (value <= req) return 'PASS';
-  if (value <= req * 1.1) return 'WARN';
-  return 'FAIL';
-}
+  return dataset;
+};
 
-const STATUS_COLOR = { PASS: 'success', WARN: 'warning', FAIL: 'error', 'N/A': 'default' };
-const STATUS_RANK = { FAIL: 0, WARN: 1, PASS: 2, 'N/A': 3 };
-
-function worstStatus(statuses) {
-  return statuses.reduce((w, s) => STATUS_RANK[s] < STATUS_RANK[w] ? s : w, 'N/A');
-}
-
-function fmtDay(d) {
-  if (!d) return '';
-  const [, m, day] = d.split('-');
-  return `${m}/${day}`;
-}
-
-/** Merge per-operator series arrays into [{day, OpA, OpB, ...}] for recharts */
-function mergeSeriesByDay(operators) {
-  const dayMap = {};
-  for (const op of operators) {
-    for (const pt of op.series) {
-      if (!dayMap[pt.day]) dayMap[pt.day] = { day: pt.day };
-      dayMap[pt.day][op.operator_name] = pt.value;
-    }
-  }
-  return Object.values(dayMap).sort((a, b) => a.day.localeCompare(b.day));
-}
-
-function KpiCard({ kpi, opColorMap }) {
-  const theme = useTheme();
-  const chartData = useMemo(() => mergeSeriesByDay(kpi.operators), [kpi.operators]);
-  const threshVal = kpi.threshold ? Number(kpi.threshold.required_value) : null;
-
-  const opStatuses = kpi.operators.map((op) => {
-    const last = op.series.length ? op.series[op.series.length - 1].value : null;
-    return { name: op.operator_name, value: last, status: getStatus(last, kpi.threshold) };
-  });
-  const worst = worstStatus(opStatuses.map((s) => s.status));
-
-  return (
-    <Card variant="outlined" sx={{ height: '100%' }}>
-      <CardContent sx={{ p: '20px !important', pb: '16px !important' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
-          <Typography variant="body1" color="text.secondary" fontWeight={500} lineHeight={1.3} sx={{ maxWidth: '72%' }}>
-            {kpi.kpi_name}
-          </Typography>
-          <Chip label={worst} size="small" color={STATUS_COLOR[worst]} sx={{ height: 22, fontSize: 12, fontWeight: 600 }} />
-        </Stack>
-
-        {/* per-operator latest values */}
-        <Stack direction="row" flexWrap="wrap" gap={1} mb={1.5}>
-          {opStatuses.map((op, i) => (
-            <Box key={op.name} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: opColorMap[op.name] ?? OP_COLORS[i] }} />
-              <Typography variant="body2" color="text.secondary" lineHeight={1}>
-                {op.name}:&nbsp;
-              </Typography>
-              <Typography variant="body2" fontWeight={600} color={theme.palette[STATUS_COLOR[op.status]]?.main ?? 'text.primary'}>
-                {op.value != null ? `${Number(op.value).toFixed(1)}${kpi.unit}` : '—'}
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
-
-        {chartData.length > 1 ? (
-          <ResponsiveContainer width="100%" height={130}>
-            <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <XAxis dataKey="day" tickFormatter={fmtDay} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} width={42} />
-              <Tooltip
-                formatter={(v, name) => [`${Number(v).toFixed(2)} ${kpi.unit}`, name]}
-                labelFormatter={fmtDay}
-                contentStyle={{ fontSize: 11 }}
-              />
-              {threshVal != null && (
-                <ReferenceLine y={threshVal} stroke={theme.palette.error.main} strokeDasharray="4 3" strokeWidth={1} />
-              )}
-              {kpi.operators.map((op, i) => (
-                <Line
-                  key={op.operator_name}
-                  type="monotone"
-                  dataKey={op.operator_name}
-                  stroke={opColorMap[op.operator_name] ?? OP_COLORS[i % OP_COLORS.length]}
-                  dot={false}
-                  strokeWidth={1.5}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <Box sx={{ height: 90, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.disabled">Not enough data</Typography>
-          </Box>
-        )}
-
-        {kpi.threshold && (
-          <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
-            Threshold: {kpi.threshold.comparator} {Number(kpi.threshold.required_value).toFixed(1)} {kpi.unit}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+const MASTER_DATASET = generateMockKPIs();
 
 export default function PmKpiDashboard() {
-  const { from: defFrom, to: defTo } = defaultDates();
-  const [operators, setOperators] = useState([]);
-  const [operatorId, setOperatorId] = useState('');   // '' = all operators
-  const [tech, setTech] = useState('2G');
-  const [from, setFrom] = useState(defFrom);
-  const [to, setTo] = useState(defTo);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const tip = useChartTip();
 
-  useEffect(() => {
-    get('/operators').then((r) => setOperators(r.data ?? [])).catch(() => {});
-  }, []);
+  // Filters State
+  const [selectedOperators, setSelectedOperators] = useState(['Orange', 'Africell', 'Qcell', 'Sierra Tel']);
+  const [selectedTech, setSelectedTech] = useState('4G');
+  const [selectedKpi, setSelectedKpi] = useState('dl_speed');
+  const [fromDate, setFromDate] = useState('2026-06-15');
+  const [toDate, setToDate] = useState('2026-07-15');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const load = useCallback(() => {
-    setLoading(true);
-    const params = { technology: tech, from, to };
-    if (operatorId) params.operatorId = operatorId;
-    get('/kpis/pm-timeseries', params)
-      .then((r) => setData(r.data ?? []))
-      .catch(() => setData([]))
-      .finally(() => setLoading(false));
-  }, [operatorId, tech, from, to]);
+  // Selected KPI Detail Info
+  const activeKpiInfo = useMemo(() => {
+    return KPI_DEFS.find((k) => k.key === selectedKpi) || KPI_DEFS[0];
+  }, [selectedKpi]);
 
-  useEffect(() => { load(); }, [load]);
+  // 1. Filtered data: Scoped strictly to operators, technology, and date range
+  const filteredDataset = useMemo(() => {
+    return MASTER_DATASET.filter((row) => {
+      const isOpMatch = selectedOperators.includes(row.operator);
+      const isTechMatch = row.technology === selectedTech;
+      const isDateMatch = row.date >= fromDate && row.date <= toDate;
+      return isOpMatch && isTechMatch && isDateMatch;
+    });
+  }, [selectedOperators, selectedTech, fromDate, toDate]);
 
-  // Stable color map: operator_name → color
-  const opColorMap = useMemo(() => {
-    const map = {};
-    operators.forEach((op, i) => { map[op.operator_name] = OP_COLORS[i % OP_COLORS.length]; });
-    return map;
-  }, [operators]);
+  // 2. Line Chart Data: Time series grouped by day and operators
+  const lineChartData = useMemo(() => {
+    const dayMap = {};
+    filteredDataset.forEach((row) => {
+      if (row.kpi_key !== selectedKpi) return;
+      if (!dayMap[row.date]) {
+        dayMap[row.date] = { date: row.date };
+      }
+      dayMap[row.date][row.operator] = row.value;
+    });
+    return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
+  }, [filteredDataset, selectedKpi]);
 
-  const visibleKpis = useMemo(() => {
-    if (!data) return [];
-    const keys = TECH_KPIS[tech] ?? [];
-    const map = Object.fromEntries(data.map((k) => [k.kpi_key, k]));
-    return keys.map((key) => map[key]).filter(Boolean);
-  }, [data, tech]);
+  // 3. Bar Chart Data: Side-by-side Tech comparison for the selected KPI
+  const barChartData = useMemo(() => {
+    // Generate averages across all technologies (2G, 3G, 4G, 5G) for selected operators and dates
+    const techStats = {};
+    const techs = ['2G', '3G', '4G', '5G'];
+    
+    techs.forEach((t) => {
+      techStats[t] = { name: t };
+      selectedOperators.forEach((op) => {
+        const rows = MASTER_DATASET.filter((r) => 
+          r.kpi_key === selectedKpi && 
+          r.operator === op && 
+          r.technology === t && 
+          r.date >= fromDate && 
+          r.date <= toDate
+        );
+        if (rows.length) {
+          const avg = rows.reduce((sum, r) => sum + r.value, 0) / rows.length;
+          techStats[t][op] = Number(avg.toFixed(2));
+        }
+      });
+    });
+    return Object.values(techStats);
+  }, [selectedKpi, selectedOperators, fromDate, toDate]);
+
+  // 4. Donut Chart Data: Total Failures / Anomalies Share by operator
+  const donutChartData = useMemo(() => {
+    const share = {};
+    selectedOperators.forEach((op) => {
+      share[op] = 0;
+    });
+
+    // Count how many times each operator failed the KPI threshold in the selection
+    filteredDataset.forEach((row) => {
+      const kpi = KPI_DEFS.find((k) => k.key === row.kpi_key);
+      if (!kpi) return;
+      const isFailed = kpi.isHigherBetter 
+        ? row.value < kpi.target 
+        : row.value > kpi.target;
+      
+      if (isFailed && share[row.operator] !== undefined) {
+        share[row.operator]++;
+      }
+    });
+
+    return Object.entries(share).map(([name, value]) => ({
+      name,
+      value: value > 0 ? value : 1, // Fallback to 1 to show slice if no failures exist
+    }));
+  }, [filteredDataset, selectedOperators]);
+
+  // 5. Matrix Averages Table: Map of [kpi_key] -> { [operator]: avg_value }
+  const matrixAverages = useMemo(() => {
+    const averages = {};
+    KPI_DEFS.forEach((kpi) => {
+      averages[kpi.key] = {};
+      selectedOperators.forEach((op) => {
+        const rows = filteredDataset.filter((r) => r.kpi_key === kpi.key && r.operator === op);
+        if (rows.length) {
+          const avg = rows.reduce((sum, r) => sum + r.value, 0) / rows.length;
+          averages[kpi.key][op] = Number(avg.toFixed(2));
+        } else {
+          averages[kpi.key][op] = null;
+        }
+      });
+    });
+    return averages;
+  }, [filteredDataset, selectedOperators]);
+
+  // Filter KPI list based on search bar
+  const searchedKpis = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return KPI_DEFS;
+    return KPI_DEFS.filter((kpi) => 
+      kpi.name.toLowerCase().includes(q) || 
+      kpi.category.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
+
+  // Score health badge colors
+  const getCellStatus = (value, kpi) => {
+    if (value == null) return 'default';
+    const isHigherBetter = kpi.isHigherBetter;
+    const target = kpi.target;
+
+    if (isHigherBetter) {
+      if (value >= target) return 'success';
+      if (value >= target * 0.96) return 'warning';
+      return 'error';
+    } else {
+      if (value <= target) return 'success';
+      if (value <= target * 1.08) return 'warning';
+      return 'error';
+    }
+  };
+
+  const getCellBg = (status) => {
+    if (status === 'success') return alpha(theme.palette.success.main, isDark ? 0.18 : 0.08);
+    if (status === 'warning') return alpha(theme.palette.warning.main, isDark ? 0.18 : 0.08);
+    if (status === 'error') return alpha(theme.palette.error.main, isDark ? 0.18 : 0.08);
+    return 'transparent';
+  };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" fontWeight={500} mb={2}>PM KPI Dashboard</Typography>
+    <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+      <PageHeader
+        icon={<MultilineChartIcon />}
+        title="KPI Health Matrix"
+        subtitle="Professional analytical dashboard tracking 25 cellular network key performance indicators across active operators in Sierra Leone"
+      />
 
-      {/* filters */}
-      <Stack direction="row" flexWrap="wrap" gap={2} mb={2} alignItems="center">
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Operator</InputLabel>
-          <Select value={operatorId} label="Operator" onChange={(e) => setOperatorId(e.target.value)}>
-            <MenuItem value="">All Operators</MenuItem>
-            {operators.map((o) => (
-              <MenuItem key={o.operator_id} value={o.operator_id}>{o.operator_name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <TextField
-          size="small" type="date" label="From" value={from} sx={{ width: 150 }}
-          onChange={(e) => setFrom(e.target.value)} InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          size="small" type="date" label="To" value={to} sx={{ width: 150 }}
-          onChange={(e) => setTo(e.target.value)} InputLabelProps={{ shrink: true }}
-        />
-      </Stack>
+      {/* ── Section 1: Filters Card ────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
+        <Grid container spacing={2} alignItems="center">
+          
+          {/* Operator Select */}
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Operators</InputLabel>
+              <Select
+                multiple
+                value={selectedOperators}
+                input={<OutlinedInput label="Operators" />}
+                onChange={(e) => setSelectedOperators(e.target.value)}
+                renderValue={(sel) => sel.join(', ')}
+              >
+                {['Orange', 'Africell', 'Qcell', 'Sierra Tel'].map((op) => (
+                  <MenuItem key={op} value={op}>
+                    <Checkbox size="small" checked={selectedOperators.includes(op)} />
+                    <ListItemText primary={op} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
 
-      {/* operator color legend */}
-      {operators.length > 0 && (
-        <Stack direction="row" flexWrap="wrap" gap={1.5} mb={2}>
-          {(operatorId ? operators.filter((o) => o.operator_id === Number(operatorId)) : operators).map((op, i) => (
-            <Stack key={op.operator_id} direction="row" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 12, height: 3, borderRadius: 2, bgcolor: opColorMap[op.operator_name] ?? OP_COLORS[i] }} />
-              <Typography variant="caption" color="text.secondary">{op.operator_name}</Typography>
-            </Stack>
-          ))}
-        </Stack>
-      )}
+          {/* Technology Select Toggle */}
+          <Grid item xs={12} sm={6} md={2}>
+            <ToggleButtonGroup
+              size="small"
+              value={selectedTech}
+              exclusive
+              fullWidth
+              onChange={(_e, val) => val && setSelectedTech(val)}
+              aria-label="technology selection"
+            >
+              {['2G', '3G', '4G', '5G'].map((t) => (
+                <ToggleButton key={t} value={t} sx={{ py: 1 }}>{t}</ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Grid>
 
-      {/* technology tabs */}
-      <Stack direction="row" gap={1} mb={2}>
-        {TECH_TABS.map((t) => (
-          <Chip
-            key={t} label={t} clickable
-            color={tech === t ? 'primary' : 'default'}
-            variant={tech === t ? 'filled' : 'outlined'}
-            onClick={() => setTech(t)}
-          />
-        ))}
-      </Stack>
+          {/* From Date */}
+          <Grid item xs={6} sm={3} md={2}>
+            <TextField
+              size="small"
+              type="date"
+              label="From"
+              value={fromDate}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+          </Grid>
 
-      {loading ? (
-        <Loading />
-      ) : visibleKpis.length === 0 ? (
-        <EmptyState message={`No ${tech} KPI data found for the selected period`} />
-      ) : (
-        <Grid container spacing={2}>
-          {visibleKpis.map((kpi) => (
-            <Grid item xs={12} sm={6} key={kpi.kpi_key}>
-              <KpiCard kpi={kpi} opColorMap={opColorMap} />
-            </Grid>
-          ))}
+          {/* To Date */}
+          <Grid item xs={6} sm={3} md={2}>
+            <TextField
+              size="small"
+              type="date"
+              label="To"
+              value={toDate}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+          </Grid>
+
+          {/* KPI Dropdown Selection */}
+          <Grid item xs={12} md={3}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Selected KPI Analyzer</InputLabel>
+              <Select
+                value={selectedKpi}
+                label="Selected KPI Analyzer"
+                onChange={(e) => setSelectedKpi(e.target.value)}
+              >
+                {KPI_DEFS.map((k) => (
+                  <MenuItem key={k.key} value={k.key}>{k.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
         </Grid>
-      )}
+      </Paper>
+
+      {/* ── Section 2: Cards Row ──────────────────────── */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {selectedOperators.map((op) => {
+          const value = matrixAverages[selectedKpi]?.[op];
+          const status = getCellStatus(value, activeKpiInfo);
+          const color = status === 'success' ? 'success' : status === 'warning' ? 'warning' : 'error';
+
+          return (
+            <Grid item xs={12} sm={6} md={3} key={op}>
+              <Card variant="outlined" sx={{ borderLeft: `4px solid ${OP_COLORS[op]}` }}>
+                <CardContent sx={{ py: '16px !important', px: 2 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600} textTransform="uppercase">
+                    {op} Average
+                  </Typography>
+                  <Stack direction="row" justifyContent="space-between" alignItems="baseline" mt={1}>
+                    <Typography variant="h4" fontWeight={800}>
+                      {value != null ? `${value.toFixed(1)}${activeKpiInfo.unit}` : '—'}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={status === 'success' ? 'Pass' : status === 'warning' ? 'Warning' : 'Fail'}
+                      color={color}
+                      sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
+                    />
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      {/* ── Section 3: Charts Panel Grid ──────────────── */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        
+        {/* Chart 1: Line Chart (Daily trend over time) */}
+        <Grid item xs={12} lg={8}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: 380, borderRadius: 3 }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
+              {activeKpiInfo.name} — Time Series Trend
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+              Tracks daily quality index across selected carriers. Target: {activeKpiInfo.isHigherBetter ? '≥' : '≤'} {activeKpiInfo.target}{activeKpiInfo.unit}
+            </Typography>
+            
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={lineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                <Tooltip
+                  contentStyle={tip}
+                  formatter={(v, name) => [`${Number(v).toFixed(2)} ${activeKpiInfo.unit}`, name]}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                
+                {/* Benchmark target line */}
+                <ReferenceLine
+                  y={activeKpiInfo.target}
+                  stroke={theme.palette.error.main}
+                  strokeDasharray="4 4"
+                  label={{ value: 'Target', fill: theme.palette.error.main, fontSize: 10, position: 'insideBottomRight' }}
+                />
+
+                {selectedOperators.map((op) => (
+                  <Line
+                    key={op}
+                    type="monotone"
+                    dataKey={op}
+                    stroke={OP_COLORS[op]}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        {/* Chart 2: Donut Chart (Total failures share) */}
+        <Grid item xs={12} lg={4}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: 380, borderRadius: 3 }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
+              KPI Failures Share
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+              Distribution of instances where service benchmark targets were missed.
+            </Typography>
+
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={donutChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {donutChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={OP_COLORS[entry.name]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={tip} formatter={(v) => [`${v} anomalies`, 'Failures Count']} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        {/* Chart 3: Bar Chart (Technology comparison matrix) */}
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: 360, borderRadius: 3 }}>
+            <Typography variant="subtitle1" fontWeight={700} mb={0.5}>
+              Technology Comparison Matrix (2G vs. 3G vs. 4G vs. 5G)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+              Shows average KPI index compared side-by-side across all network generations.
+            </Typography>
+
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={barChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
+                <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                <Tooltip contentStyle={tip} formatter={(v, name) => [`${v} ${activeKpiInfo.unit}`, name]} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                
+                {selectedOperators.map((op) => (
+                  <Bar
+                    key={op}
+                    dataKey={op}
+                    fill={OP_COLORS[op]}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+      </Grid>
+
+      {/* ── Section 4: 25 KPI matrix table ────────────── */}
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <Stack direction="row" p={2.5} justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>
+              {selectedTech} Network KPIs Health Matrix
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Review average values of all 25 performance criteria. Target thresholds are color-coded.
+            </Typography>
+          </Box>
+          <TextField
+            size="small"
+            placeholder="Search KPI or Category..."
+            value={searchQuery}
+            sx={{ minWidth: 260 }}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
+
+        <Divider />
+
+        <TableContainer sx={{ maxHeight: 600 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ minWidth: 200, fontWeight: 700 }}>KPI Name</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Benchmark Target</TableCell>
+                {selectedOperators.map((op) => (
+                  <TableCell
+                    key={op}
+                    align="center"
+                    sx={{
+                      minWidth: 120,
+                      fontWeight: 700,
+                      borderLeft: `2.5px solid ${OP_COLORS[op]}`,
+                    }}
+                  >
+                    {op}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {searchedKpis.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={selectedOperators.length + 3} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">No KPIs match the search query.</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                searchedKpis.map((kpi) => {
+                  return (
+                    <TableRow key={kpi.key} hover>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Typography variant="body2" fontWeight={600}>{kpi.name}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={kpi.category} size="small" variant="outlined" sx={{ height: 20, fontSize: 10 }} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" fontWeight={700}>
+                          {kpi.isHigherBetter ? '≥' : '≤'} {kpi.target} {kpi.unit}
+                        </Typography>
+                      </TableCell>
+                      {selectedOperators.map((op) => {
+                        const val = matrixAverages[kpi.key]?.[op];
+                        const status = getCellStatus(val, kpi);
+                        const labelColor = status === 'success' ? 'success.main' : status === 'warning' ? 'warning.main' : 'error.main';
+
+                        return (
+                          <TableCell
+                            key={op}
+                            align="center"
+                            sx={{
+                              bgcolor: getCellBg(status),
+                              borderLeft: `1px solid ${alpha(OP_COLORS[op], 0.15)}`,
+                            }}
+                          >
+                            <Typography variant="body2" fontWeight={700} color={val != null ? labelColor : 'text.disabled'}>
+                              {val != null ? `${val.toFixed(1)}${kpi.unit}` : '—'}
+                            </Typography>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     </Box>
   );
 }

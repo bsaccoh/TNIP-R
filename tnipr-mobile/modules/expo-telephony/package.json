@@ -1,8 +1,0 @@
-{
-  "name": "expo-telephony",
-  "version": "1.0.0",
-  "description": "Read live cellular signal metrics from Android TelephonyManager",
-  "main": "src/index",
-  "types": "src/index",
-  "private": true
-}

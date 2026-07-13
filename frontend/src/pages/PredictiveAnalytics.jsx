@@ -11,6 +11,7 @@ import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { api } from '../api/client';
 import PageHeader from '../components/PageHeader';
+import { opColor } from '../theme';
 
 /* ── Meta ────────────────────────────────────────────────────────────────── */
 const RISK_META = {
@@ -21,19 +22,7 @@ const RISK_META = {
 
 const GRADE_COLOR = { A: '#2e7d32', B: '#558b2f', C: '#f57f17', D: '#e65100', F: '#c62828' };
 
-const OP_COLORS = {
-  Orange:   '#ff7900',
-  Africell: '#8e24aa',
-  Qcell:    '#5b2d8e',
-  SierraTel:'#00a3e0',
-};
 
-function opColor(name) {
-  for (const [k, v] of Object.entries(OP_COLORS)) {
-    if (name?.toLowerCase().includes(k.toLowerCase())) return v;
-  }
-  return '#1565c0';
-}
 
 function TrendIcon({ trend }) {
   if (trend === 'UP')   return <TrendingUpIcon   sx={{ fontSize: 18, color: '#2e7d32' }} />;

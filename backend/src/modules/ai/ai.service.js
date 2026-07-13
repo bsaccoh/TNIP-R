@@ -1,6 +1,7 @@
 import { query } from '../../config/db.js';
 import { logger } from '../../config/logger.js';
 import { llmEnabled, llmComplete } from './ai.provider.js';
+import { createNotification } from '../notifications/notifications.service.js';
 
 // ─── Anomaly detection (z-score over each operator+KPI daily series) ─────────
 export async function detectAnomalies({ operatorId = null, threshold = 2.5 } = {}) {
@@ -48,6 +49,8 @@ export async function detectAnomalies({ operatorId = null, threshold = 2.5 } = {
 /** Persist detected anomalies and derive recommendations. */
 export async function runAnomalyScan(operatorId = null) {
   const anomalies = await detectAnomalies({ operatorId });
+  let alertsDispatched = 0;
+
   for (const a of anomalies) {
     await query(
       `INSERT INTO anomaly_detections (operator_id, kpi_id, cell_id, ts, value, expected, deviation, method, severity)
@@ -55,8 +58,25 @@ export async function runAnomalyScan(operatorId = null) {
          FROM kpi_definitions k WHERE k.kpi_key = :kpi`,
       { op: a.operatorId, cell: a.cellId, ts: a.ts, val: a.value, exp: a.expected, dev: a.deviation, sev: a.severity, kpi: a.kpiKey }
     );
+
+    if (a.severity === 'HIGH' || a.severity === 'CRITICAL') {
+      const operatorNameRes = await query('SELECT operator_name FROM operators WHERE operator_id = :op', { op: a.operatorId });
+      const opName = operatorNameRes[0]?.operator_name || 'Unknown Operator';
+      const title = `AI Anomaly Detected: ${a.kpiKey} — ${opName}`;
+      const body = `Statistical anomaly detected (Severity: ${a.severity}). ${a.kpiKey} deviation of ${a.deviation}σ. Expected: ${a.expected}, Actual: ${a.value}.`;
+
+      // Avoid spamming duplicate notifications for the same operator and KPI in the last 24h
+      const [{ cnt }] = await query(
+        `SELECT COUNT(*) AS cnt FROM notifications WHERE title = :title AND created_at > NOW() - INTERVAL 24 HOUR`,
+        { title }
+      );
+      if (Number(cnt) === 0) {
+        await createNotification({ operatorId: null, title, body });
+        alertsDispatched++;
+      }
+    }
   }
-  return { detected: anomalies.length };
+  return { detected: anomalies.length, alertsDispatched };
 }
 
 // ─── Conversational assistant — deterministic intent router ─────────────────

@@ -17,6 +17,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PageHeader from '../components/PageHeader';
+import { OPERATOR_COLORS, opColor } from '../theme';
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const TECH_COLOR = { '2G': '#546e7a', '3G': '#1565c0', '4G': '#2e7d32', '5G': '#6a1b9a', Other: '#795548' };
@@ -39,13 +40,7 @@ const INT_STATUS_CHIP = {
   DISMISSED:     { color: 'default', label: 'Dismissed' },
 };
 
-const OP_COLORS = { Orange: '#ff7900', Africell: '#8e24aa', Qcell: '#5b2d8e', SierraTel: '#00a3e0' };
-function opColor(name) {
-  for (const [k, v] of Object.entries(OP_COLORS)) {
-    if (name?.toLowerCase().includes(k.toLowerCase())) return v;
-  }
-  return '#1565c0';
-}
+
 
 /* ── Frequency band visualizer ───────────────────────────────────────────── */
 function BandVisualizer({ bands, assignments }) {
@@ -134,7 +129,7 @@ function BandVisualizer({ bands, assignments }) {
         </Box>
         {/* Legend */}
         <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mt: 1.5 }}>
-          {Object.entries(OP_COLORS).map(([name, color]) => (
+          {Object.entries(OPERATOR_COLORS).map(([name, color]) => (
             <Stack key={name} direction="row" spacing={0.5} alignItems="center">
               <Box sx={{ width: 10, height: 10, bgcolor: color, borderRadius: '2px' }} />
               <Typography variant="caption" color="text.secondary">{name}</Typography>

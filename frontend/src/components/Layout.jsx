@@ -126,6 +126,7 @@ const NAV = [
     group: 'network', label: 'Network & Coverage', icon: <CellTowerIcon />,
     children: [
       { to: '/map', label: 'Coverage Map', icon: <MapIcon /> },
+      { to: '/regional-coverage', label: 'Regional Coverage', icon: <MapIcon /> },
       { to: '/inventory', label: 'Network Inventory', icon: <CellTowerIcon /> },
       { to: '/spectrum', label: 'Spectrum Management', icon: <CellWifiIcon />, roles: ALL_STAFF, permissions: ['compliance:read'] },
       { to: '/counters', label: 'Counter Dictionary', icon: <ListAltIcon />, roles: ALL_STAFF, permissions: ['kpi:read', 'kpi:write'] },

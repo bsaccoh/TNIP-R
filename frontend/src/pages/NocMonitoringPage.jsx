@@ -69,7 +69,7 @@ const ChartCard = ({ title, subtitle, extraHeader, children, onExpand }) => {
   const cardStyle = {
     background: theme.palette.background.paper,
     border: '1px solid rgba(255, 255, 255, 0.05)',
-    boxShadow: theme.shadows ? theme.shadows[4] : '0 4px 30px rgba(0,0,0,0.4)',
+    boxShadow: theme.shadows ? theme.shadows[1] : '0 1px 6px rgba(0,0,0,0.2)',
     height: '100%',
     borderRadius: 2
   };
@@ -220,8 +220,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <LineChart data={getFilteredData(mockMonthlyPerformance, isExpanded, 'month')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['auto', 100]} />
+          <XAxis dataKey="month" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['auto', 100]} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -274,8 +274,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredCellsByTech} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           <Bar dataKey="2G" fill="#f43f5e" />
@@ -319,8 +319,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredSitesByOp} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
             {filteredSitesByOp.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[entry.operator]} />)}
@@ -335,8 +335,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={mockUnknownCounters} layout="vertical" margin={{ left: 20, right: 10, top: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" horizontal={false} />
-          <XAxis type="number" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} />
-          <YAxis dataKey="category" type="category" stroke="rgba(255,255,255,0.7)" style={{ fontSize: '0.7rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
+          <XAxis type="number" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} />
+          <YAxis dataKey="category" type="category" stroke={theme.palette.text.primary} style={{ fontSize: '0.7rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
         </BarChart>
@@ -349,8 +349,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <ComposedChart data={getFilteredData(mockCounterGrowth, isExpanded, 'date')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="date" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} itemStyle={{ color: theme.palette.text.primary }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -367,8 +367,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <AreaChart data={getFilteredData(mockThroughputTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="time" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           <Area type="monotone" dataKey="DL" name="DL Throughput (Mbps)" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
@@ -383,8 +383,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <LineChart data={getFilteredData(mockCssrTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['dataMin - 1', 100]} />
+          <XAxis dataKey="time" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} domain={['dataMin - 1', 100]} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -401,8 +401,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredAlarms} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           <Bar dataKey="Critical" stackId="a" fill={COLORS.Critical} />
@@ -418,8 +418,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <AreaChart data={getFilteredData(mockOutages, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="time" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -451,9 +451,9 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <ComposedChart data={filteredQos} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="left" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis yAxisId="right" orientation="right" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis yAxisId="left" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis yAxisId="right" orientation="right" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Bar yAxisId="right" dataKey="packetLoss" barSize={30} fill="#f59e0b" name="Packet Loss %" radius={[4, 4, 0, 0]} />
           <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#10b981" strokeWidth={3} dot={{ r: 6 }} name="Latency (ms)" />
@@ -468,8 +468,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={mockRegionalDcr} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="region" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="region" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -485,8 +485,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <LineChart data={getFilteredData(mockDcrTrend, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="time" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -502,8 +502,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <ComposedChart data={getFilteredData(mockTraffic, isExpanded, 'time')} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="time" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           {activeOperators.map(op => (
@@ -522,8 +522,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredCellStatus} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           <Bar dataKey="Healthy" stackId="a" fill={COLORS.Healthy} />
@@ -540,8 +540,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredSiteStatus} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-          <XAxis dataKey="operator" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
-          <YAxis stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="operator" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
+          <YAxis stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
           <Bar dataKey="Operational" stackId="a" fill={COLORS.Operational} />
@@ -557,8 +557,8 @@ export default function NocMonitoringPage() {
       <ResponsiveContainer>
         <BarChart data={filteredCongested} layout="vertical" margin={{ left: 50, right: 10, top: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" horizontal={false} />
-          <XAxis type="number" stroke="rgba(255,255,255,0.4)" style={{ fontSize: '0.75rem' }} />
-          <YAxis dataKey="cellId" type="category" stroke="rgba(255,255,255,0.7)" style={{ fontSize: '0.7rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
+          <XAxis type="number" stroke={theme.palette.text.secondary} style={{ fontSize: '0.75rem' }} />
+          <YAxis dataKey="cellId" type="category" stroke={theme.palette.text.primary} style={{ fontSize: '0.7rem', fontWeight: 700 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ backgroundColor: theme.palette.background.default, border: '1px solid rgba(255,255,255,0.1)' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
           <Bar dataKey="utilization" radius={[0, 4, 4, 0]} barSize={12} name="Utilization %">
             {filteredCongested.map((entry, index) => (

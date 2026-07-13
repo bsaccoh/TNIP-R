@@ -378,7 +378,7 @@ CREATE TABLE IF NOT EXISTS counter_definitions (
 
 -- High-volume fact table. Partition-ready by timestamp in production.
 CREATE TABLE IF NOT EXISTS counter_values (
-  counter_value_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  counter_value_id BIGINT AUTO_INCREMENT,
   operator_id  INT NOT NULL,
   pm_file_id   INT NOT NULL,
   site_id      INT NULL,
@@ -386,14 +386,18 @@ CREATE TABLE IF NOT EXISTS counter_values (
   counter_id   INT NOT NULL,
   ts           DATETIME NOT NULL,
   value        DOUBLE NULL,
-  FOREIGN KEY (operator_id) REFERENCES operators(operator_id),
-  FOREIGN KEY (pm_file_id)  REFERENCES pm_files(pm_file_id) ON DELETE CASCADE,
-  FOREIGN KEY (cell_id)     REFERENCES cells(cell_id),
-  FOREIGN KEY (counter_id)  REFERENCES counter_definitions(counter_id),
+  PRIMARY KEY (counter_value_id, ts),
   INDEX idx_cv_lookup (operator_id, cell_id, counter_id, ts),
   INDEX idx_cv_file (pm_file_id),
   INDEX idx_cv_ts (ts)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+PARTITION BY RANGE COLUMNS(ts) (
+  PARTITION p2025_h1 VALUES LESS THAN ('2025-07-01'),
+  PARTITION p2025_h2 VALUES LESS THAN ('2026-01-01'),
+  PARTITION p2026_h1 VALUES LESS THAN ('2026-07-01'),
+  PARTITION p2026_h2 VALUES LESS THAN ('2027-01-01'),
+  PARTITION p_max    VALUES LESS THAN (MAXVALUE)
+);
 
 -- ─── KPI engine ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS kpi_definitions (

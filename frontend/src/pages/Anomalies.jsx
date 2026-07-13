@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Stack, Table, TableHead, TableBody,
   TableRow, TableCell, Chip, Button, FormControl, InputLabel, Select, MenuItem,
-  Alert, LinearProgress,
+  Alert, LinearProgress, TablePagination
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import RadarIcon from '@mui/icons-material/Radar';
@@ -20,6 +20,10 @@ export default function Anomalies() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
   const load = () => {
     const params = {};
     if (filterOp)  params.operatorId = filterOp;
@@ -27,7 +31,11 @@ export default function Anomalies() {
     get('/anomalies', params).then(r => setData(r.data?.rows ?? r.data)).catch(() => setData([]));
   };
 
-  useEffect(() => { load(); }, [filterOp, filterSev]);
+  useEffect(() => { 
+    setPage(0); // Reset page on filter change
+    load(); 
+  }, [filterOp, filterSev]);
+  
   useEffect(() => { get('/operators').then(r => setOperators(r.data || [])); }, []);
 
   const runScan = async () => {
@@ -41,6 +49,16 @@ export default function Anomalies() {
   };
 
   const rows = Array.isArray(data) ? data : [];
+  const displayedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -93,51 +111,62 @@ export default function Anomalies() {
           {!data ? <Box p={3}><Loading /></Box> : !rows.length ? (
             <Box p={3}><EmptyState message="No anomalies detected." hint="Run a scan to check today's KPI values against yesterday." /></Box>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Detected</TableCell>
-                  <TableCell>Operator</TableCell>
-                  <TableCell>KPI</TableCell>
-                  <TableCell>Today</TableCell>
-                  <TableCell>Yesterday</TableCell>
-                  <TableCell>Change</TableCell>
-                  <TableCell>Direction</TableCell>
-                  <TableCell>Severity</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map(r => (
-                  <TableRow key={r.anomaly_id} hover>
-                    <TableCell>
-                      <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                        {new Date(r.created_at).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell><Typography variant="body2" fontWeight={600}>{r.operator_name}</Typography></TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>{r.kpi_key}</Typography>
-                      <Typography variant="caption" color="text.secondary">{r.kpi_name}</Typography>
-                    </TableCell>
-                    <TableCell><Typography variant="body2">{Number(r.value).toFixed(2)}{r.unit}</Typography></TableCell>
-                    <TableCell><Typography variant="caption" color="text.secondary">{Number(r.expected).toFixed(2)}{r.unit}</Typography></TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={700}
-                        color={r.deviation >= 30 ? 'error.main' : r.deviation >= 15 ? 'warning.main' : 'info.main'}>
-                        {Number(r.deviation).toFixed(1)}%
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip size="small" label={r.method === 'pct_change' ? (Number(r.value) < Number(r.expected) ? '↓ DROP' : '↑ SPIKE') : r.method}
-                        color={Number(r.value) < Number(r.expected) ? 'error' : 'warning'} variant="outlined" />
-                    </TableCell>
-                    <TableCell>
-                      <Chip size="small" label={r.severity} color={SEV_COLOR[r.severity] || 'default'} />
-                    </TableCell>
+            <>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Detected</TableCell>
+                    <TableCell>Operator</TableCell>
+                    <TableCell>KPI</TableCell>
+                    <TableCell>Today</TableCell>
+                    <TableCell>Yesterday</TableCell>
+                    <TableCell>Change</TableCell>
+                    <TableCell>Direction</TableCell>
+                    <TableCell>Severity</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {displayedRows.map(r => (
+                    <TableRow key={r.anomaly_id} hover>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                          {new Date(r.created_at).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell><Typography variant="body2" fontWeight={600}>{r.operator_name}</Typography></TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>{r.kpi_key}</Typography>
+                        <Typography variant="caption" color="text.secondary">{r.kpi_name}</Typography>
+                      </TableCell>
+                      <TableCell><Typography variant="body2">{Number(r.value).toFixed(2)}{r.unit}</Typography></TableCell>
+                      <TableCell><Typography variant="caption" color="text.secondary">{Number(r.expected).toFixed(2)}{r.unit}</Typography></TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={700}
+                          color={r.deviation >= 30 ? 'error.main' : r.deviation >= 15 ? 'warning.main' : 'info.main'}>
+                          {Number(r.deviation).toFixed(1)}%
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={r.method === 'pct_change' ? (Number(r.value) < Number(r.expected) ? '↓ DROP' : '↑ SPIKE') : r.method}
+                          color={Number(r.value) < Number(r.expected) ? 'error' : 'warning'} variant="outlined" />
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={r.severity} color={SEV_COLOR[r.severity] || 'default'} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                component="div"
+                count={rows.length}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+              />
+            </>
           )}
         </CardContent>
       </Card>

@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { get } from '../api/client';
 import { useColorMode } from '../theme/ColorMode';
+import { colorFor } from '../theme';
 
 const COLORS = ['#4c8ef7', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#f97316', '#ec4899'];
 const SEVERITY_COLORS = { CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#f59e0b', LOW: '#22c55e' };
@@ -201,8 +202,16 @@ export default function ComplaintAnalytics() {
                 <YAxis dataKey="operator_name" type="category" width={80} tick={{ fontSize: 11, fill: textColor }} />
                 <RTooltip contentStyle={{ backgroundColor: mode === 'dark' ? '#1e1e1e' : '#fff', border: '1px solid #555' }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="avg_resolution_hours" fill="#4c8ef7" name="Avg Res. (hrs)" />
-                <Bar dataKey="sla_pct" fill="#22c55e" name="SLA %" />
+                <Bar dataKey="avg_resolution_hours" name="Avg Res. (hrs)">
+                  {benchmark.map((b, i) => (
+                    <Cell key={i} fill={colorFor(b.operator_name, i)} />
+                  ))}
+                </Bar>
+                <Bar dataKey="sla_pct" name="SLA %">
+                  {benchmark.map((b, i) => (
+                    <Cell key={i} fill={colorFor(b.operator_name, i)} fillOpacity={0.55} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -218,7 +227,7 @@ export default function ComplaintAnalytics() {
                 <RTooltip contentStyle={{ backgroundColor: mode === 'dark' ? '#1e1e1e' : '#fff', border: '1px solid #555' }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {operatorNames.map((name, i) => (
-                  <Bar key={name} dataKey={name} stackId="a" fill={COLORS[i % COLORS.length]} />
+                  <Bar key={name} dataKey={name} stackId="a" fill={colorFor(name, i)} />
                 ))}
               </BarChart>
             </ResponsiveContainer>

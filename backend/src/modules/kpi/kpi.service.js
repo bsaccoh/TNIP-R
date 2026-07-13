@@ -185,7 +185,7 @@ export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
 
   const series = await query(
     `SELECT o.operator_id, o.operator_name,
-            k.kpi_key, k.name AS kpi_name, k.unit,
+            k.kpi_key, k.name AS kpi_name, k.unit, k.category, k.direction,
             DATE(ck.ts) AS day, ROUND(AVG(ck.value), 4) AS value
        FROM calculated_kpis ck
        JOIN kpi_definitions k ON k.kpi_id = ck.kpi_id
@@ -195,8 +195,8 @@ export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
         ${technologyId ? 'AND ck.technology_id = :tid' : ''}
         ${from ? 'AND ck.ts >= :from' : ''}
         ${to ? 'AND ck.ts <= :to' : ''}
-      GROUP BY o.operator_id, o.operator_name, k.kpi_key, k.name, k.unit, DATE(ck.ts)
-      ORDER BY k.kpi_key, o.operator_name, day`,
+      GROUP BY o.operator_id, o.operator_name, k.kpi_key, k.name, k.unit, k.category, k.direction, DATE(ck.ts)
+      ORDER BY k.category, k.kpi_key, o.operator_name, day`,
     {
       ...(operatorId ? { op: operatorId } : {}),
       ...(technologyId ? { tid: technologyId } : {}),
@@ -221,7 +221,11 @@ export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
   const kpiMap = {};
   for (const row of series) {
     if (!kpiMap[row.kpi_key]) {
-      kpiMap[row.kpi_key] = { kpi_key: row.kpi_key, kpi_name: row.kpi_name, unit: row.unit, operators: {} };
+      kpiMap[row.kpi_key] = {
+        kpi_key: row.kpi_key, kpi_name: row.kpi_name, unit: row.unit,
+        category: row.category || 'General', direction: row.direction || 'HIGHER_BETTER',
+        operators: {},
+      };
     }
     const ops = kpiMap[row.kpi_key].operators;
     if (!ops[row.operator_id]) {
@@ -235,6 +239,59 @@ export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
     operators: Object.values(kpi.operators),
     threshold: threshMap[kpi.kpi_key] ?? null,
   }));
+}
+
+/** PASS/WARN/FAIL for a value against a qos_thresholds row (comparator is GTE/LTE/GT/LT). */
+function statusFor(value, threshold) {
+  if (!threshold || value == null) return 'N/A';
+  const req = Number(threshold.required_value);
+  const higherBetter = threshold.comparator === 'GTE' || threshold.comparator === 'GT';
+  if (higherBetter) {
+    if (value >= req) return 'PASS';
+    if (value >= req * 0.95) return 'WARN';
+    return 'FAIL';
+  }
+  if (value <= req) return 'PASS';
+  if (value <= req * 1.1) return 'WARN';
+  return 'FAIL';
+}
+
+/**
+ * Cross-technology health summary: for each technology (2G/3G/4G/5G), the latest
+ * value of every KPI vs its threshold, rolled up into a PASS/WARN/FAIL compliance
+ * score overall and per operator. Powers technology/operator comparison views.
+ */
+export async function technologyHealthSummary({ operatorId, from, to }) {
+  const techs = Object.keys(TECH_ID);
+  const emptyCounts = () => ({ PASS: 0, WARN: 0, FAIL: 0, 'N/A': 0 });
+  const scoreOf = (c) => {
+    const total = c.PASS + c.WARN + c.FAIL;
+    return total ? Math.round((c.PASS / total) * 1000) / 10 : null;
+  };
+
+  const result = {};
+  for (const tech of techs) {
+    const kpis = await pmKpiTimeSeries({ operatorId, technology: tech, from, to });
+    const counts = emptyCounts();
+    const byOperator = {};
+    for (const kpi of kpis) {
+      for (const op of kpi.operators) {
+        const last = op.series.length ? op.series[op.series.length - 1].value : null;
+        const status = statusFor(last, kpi.threshold);
+        counts[status]++;
+        if (!byOperator[op.operator_id]) {
+          byOperator[op.operator_id] = { operator_id: op.operator_id, operator_name: op.operator_name, counts: emptyCounts() };
+        }
+        byOperator[op.operator_id].counts[status]++;
+      }
+    }
+    result[tech] = {
+      score: scoreOf(counts),
+      counts,
+      operators: Object.values(byOperator).map((o) => ({ ...o, score: scoreOf(o.counts) })),
+    };
+  }
+  return result;
 }
 
 export async function listDefinitions() {

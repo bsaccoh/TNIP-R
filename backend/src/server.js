@@ -5,6 +5,7 @@ import { waitForDb } from './config/db.js';
 import { ensureSeedAdmin } from './seed/ensureAdmin.js';
 import { startSftpPoller } from './modules/sftp/sftp.poller.js';
 import { startReportScheduler } from './jobs/reportScheduler.js';
+import { startAnomalyScheduler } from './jobs/anomalyScheduler.js';
 
 async function main() {
   await waitForDb();
@@ -21,6 +22,9 @@ async function main() {
 
   // Start scheduled report runner (checks every 5 min).
   startReportScheduler();
+
+  // Start AI Predictive Analytics anomaly scheduler (runs daily).
+  startAnomalyScheduler();
 }
 
 main().catch((err) => {

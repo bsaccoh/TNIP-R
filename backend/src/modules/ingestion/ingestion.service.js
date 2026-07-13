@@ -129,6 +129,14 @@ async function ingestPmResult({ operatorId, fileName, buffer, uploadedBy, hash }
 
     const counterMap = await resolveCounters(parsed.counterIds, technologyId, metaByKey, q);
     const cache = new Map();
+    
+    // Pre-warm cache for all known sites and cells for this operator to eliminate N+1 queries
+    const allSites = await q('SELECT site_code, site_id FROM sites WHERE operator_id=:op', { op: operatorId });
+    for (const s of allSites) cache.set(`${s.site_code}|`, { siteId: s.site_id, cellId: null });
+    
+    const allCells = await q('SELECT c.cell_code, c.cell_id, s.site_code FROM cells c JOIN sites s ON c.site_id=s.site_id WHERE c.operator_id=:op', { op: operatorId });
+    for (const c of allCells) cache.set(`${c.site_code}|${c.cell_code}`, { siteId: c.site_id, cellId: c.cell_id });
+
     const values = [];
 
     const techKey = TECH_KEY[technologyId];
@@ -150,7 +158,7 @@ async function ingestPmResult({ operatorId, fileName, buffer, uploadedBy, hash }
     }
 
     let inserted = 0;
-    const CHUNK = 1000;
+    const CHUNK = 10000;
     for (let i = 0; i < values.length; i += CHUNK) {
       const chunk = values.slice(i, i + CHUNK);
       const [res] = await conn.query(
@@ -200,6 +208,13 @@ async function ingestNamedCsv({ operatorId, fileName, buffer, uploadedBy, hash }
     const pmFileId = fileRes.insertId;
     const counterMap = await resolveCounters(parsed.meta.counterKeys, technologyId, {}, q);
     const cache = new Map();
+    
+    const allSites = await q('SELECT site_code, site_id FROM sites WHERE operator_id=:op', { op: operatorId });
+    for (const s of allSites) cache.set(`${s.site_code}|`, { siteId: s.site_id, cellId: null });
+    
+    const allCells = await q('SELECT c.cell_code, c.cell_id, s.site_code FROM cells c JOIN sites s ON c.site_id=s.site_id WHERE c.operator_id=:op', { op: operatorId });
+    for (const c of allCells) cache.set(`${c.site_code}|${c.cell_code}`, { siteId: c.site_id, cellId: c.cell_id });
+
     const values = [];
     for (const rec of parsed.records) {
       if (!rec.ts) continue;
@@ -215,8 +230,9 @@ async function ingestNamedCsv({ operatorId, fileName, buffer, uploadedBy, hash }
       }
     }
     let inserted = 0;
-    for (let i = 0; i < values.length; i += 1000) {
-      const chunk = values.slice(i, i + 1000);
+    const CHUNK = 10000;
+    for (let i = 0; i < values.length; i += CHUNK) {
+      const chunk = values.slice(i, i + CHUNK);
       const [res] = await conn.query(
         `INSERT INTO counter_values (operator_id, pm_file_id, site_id, cell_id, counter_id, ts, value)
          VALUES ${chunk.map(() => '(?,?,?,?,?,?,?)').join(',')}`, chunk.flat());

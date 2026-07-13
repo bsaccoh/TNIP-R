@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', asyncHandler(async (_req, res) => ok(res, await service.currentRankings())));
+router.get('/history', asyncHandler(async (_req, res) => ok(res, await service.rankingHistory())));
 router.post('/compute', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'),
   asyncHandler(async (_req, res) => ok(res, await service.computeRankings())));
 

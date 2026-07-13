@@ -30,6 +30,15 @@ router.get('/pm-timeseries', operatorScope, asyncHandler(async (req, res) => {
   }));
 }));
 
+router.get('/health-summary', operatorScope, asyncHandler(async (req, res) => {
+  const operatorId = req.scope?.operatorId ?? null;
+  return ok(res, await service.technologyHealthSummary({
+    operatorId,
+    from: req.query.from,
+    to: req.query.to,
+  }));
+}));
+
 router.get('/forecast', asyncHandler(async (req, res) => {
   const { operatorId, kpiId, days } = req.query;
   if (!operatorId || !kpiId) throw ApiError.badRequest('operatorId and kpiId are required');

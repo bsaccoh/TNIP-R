@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, Grid, Chip, Stack, Tooltip,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
-  LinearProgress, Drawer, IconButton, Divider, Button,
+  LinearProgress, Drawer, IconButton, Divider, Button, TablePagination
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -63,6 +63,10 @@ export default function ComplaintPortal() {
   const [selected, setSelected] = useState(null);
   const [showMap, setShowMap] = useState(false);
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -89,7 +93,19 @@ export default function ComplaintPortal() {
     get('/operators').then((r) => setOperators(r.data || [])).catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [filterStatus, filterCategory, filterSeverity, filterOperator]);
+  useEffect(() => { 
+    setPage(0); // Reset page on filter change
+    load(); 
+  }, [filterStatus, filterCategory, filterSeverity, filterOperator]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const statusCounts = {};
   summary?.byStatus?.forEach((r) => { statusCounts[r.status] = r.cnt; });
@@ -112,6 +128,8 @@ export default function ComplaintPortal() {
   const barData = Object.values(opData);
 
   const geoComplaints = complaints.filter((c) => c.lat && c.lng);
+  
+  const displayedComplaints = complaints.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const tileUrl = mode === 'dark'
     ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -279,7 +297,7 @@ export default function ComplaintPortal() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {complaints.map((c) => (
+            {displayedComplaints.map((c) => (
               <TableRow key={c.complaint_id} hover sx={{ cursor: 'pointer' }}
                 onClick={() => setSelected(c)}>
                 <TableCell>
@@ -313,6 +331,15 @@ export default function ComplaintPortal() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={complaints.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+        />
       </TableContainer>
 
       {/* Detail drawer */}

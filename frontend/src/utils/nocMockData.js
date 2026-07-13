@@ -1,8 +1,8 @@
 export const COLORS = {
-  Orange: '#FF7900',
-  Africell: '#E3000F',
-  Qcell: '#D32F2F',
-  SierraTel: '#005B9F',
+  Orange: '#ff7900',
+  Africell: '#8e24aa',
+  Qcell: '#5b2d8e',
+  SierraTel: '#00a3e0',
   Critical: '#ef4444',
   Major: '#f59e0b',
   Minor: '#eab308',

@@ -36,6 +36,8 @@ import slaRoutes from '../modules/sla/sla.routes.js';
 import fiberRoutes from '../modules/fiber/fiber.routes.js';
 import complaintsRoutes from '../modules/complaints/complaints.routes.js';
 import complaintAnalyticsRoutes from '../modules/complaint-analytics/complaint-analytics.routes.js';
+import regionalCoverageRoutes from '../modules/regional-coverage/regional-coverage.routes.js';
+import speedtestRoutes from '../modules/speedtest/speedtest.routes.js';
 
 const router = Router();
 
@@ -78,5 +80,7 @@ router.use('/sla', slaRoutes);
 router.use('/fiber', fiberRoutes);
 router.use('/complaints', complaintsRoutes);
 router.use('/complaint-analytics', complaintAnalyticsRoutes);
+router.use('/regional-coverage', regionalCoverageRoutes);
+router.use('/speedtest', speedtestRoutes);
 
 export default router;

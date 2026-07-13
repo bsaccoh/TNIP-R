@@ -98,3 +98,11 @@ export async function currentRankings() {
       ORDER BY r.rank_position`
   );
 }
+
+export async function rankingHistory() {
+  return query(
+    `SELECT o.operator_name, r.qos_score, r.rank_position, r.period
+       FROM operator_rankings r JOIN operators o ON o.operator_id=r.operator_id
+      ORDER BY r.period, r.rank_position`
+  );
+}

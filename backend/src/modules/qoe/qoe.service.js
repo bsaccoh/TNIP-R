@@ -199,7 +199,8 @@ export async function qoeSummary({ days = 30 } = {}) {
      GROUP BY day ORDER BY day`, {});
 
   const hotspots = await query(`
-    SELECT latitude, longitude, district, COUNT(*) AS count,
+    SELECT ANY_VALUE(latitude) AS latitude, ANY_VALUE(longitude) AS longitude,
+           district, COUNT(*) AS count,
            GROUP_CONCAT(DISTINCT issue_type ORDER BY issue_type SEPARATOR ', ') AS issues
       FROM consumer_complaints
      WHERE latitude IS NOT NULL AND longitude IS NOT NULL

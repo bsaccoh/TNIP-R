@@ -12,6 +12,7 @@ import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { api } from '../api/client';
 import PageHeader from '../components/PageHeader';
+import { opColor } from '../theme';
 
 /* ── RAG palette ─────────────────────────────────────────────────────────── */
 const RAG = {
@@ -25,13 +26,7 @@ const OBL_STATUS = {
   BREACHED: 'error', PENDING: 'default', WAIVED: 'default',
 };
 
-const OP_COLORS = { Orange: '#ff7900', Africell: '#8e24aa', Qcell: '#5b2d8e', SierraTel: '#00a3e0' };
-function opColor(name) {
-  for (const [k, v] of Object.entries(OP_COLORS)) {
-    if (name?.toLowerCase().includes(k.toLowerCase())) return v;
-  }
-  return '#1565c0';
-}
+
 
 /* ── Score gauge ─────────────────────────────────────────────────────────── */
 function ScoreRing({ score, rag, size = 72 }) {

@@ -49,6 +49,7 @@ import SlaDashboard from './pages/SlaDashboard';
 import FiberDashboard from './pages/FiberDashboard';
 import ComplaintPortal from './pages/ComplaintPortal';
 import ComplaintAnalytics from './pages/ComplaintAnalytics';
+import RegionalCoverage from './pages/RegionalCoverage';
 import RoleGuard from './components/RoleGuard';
 
 function Protected({ children }) {
@@ -121,6 +122,7 @@ function AppRoutes() {
         <Route path="sla-dashboard" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST']} permissions={['compliance:read']}><SlaDashboard /></RoleGuard>} />
         <Route path="complaints" element={<ComplaintPortal />} />
         <Route path="complaint-analytics" element={<ComplaintAnalytics />} />
+        <Route path="regional-coverage" element={<RegionalCoverage />} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

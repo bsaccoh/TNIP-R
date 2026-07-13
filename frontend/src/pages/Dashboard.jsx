@@ -25,10 +25,7 @@ import { colorFor } from '../theme';
 const TECH_COLORS = { '2G': '#888', '3G': '#3da9fc', '4G': '#2e9e5b', '5G': '#ef6c00' };
 const TECH_ORDER  = ['2G', '3G', '4G', '5G'];
 
-const OP_COLORS    = ['#3da9fc', '#ef6c00', '#2e9e5b', '#e0413b', '#8b5cf6', '#e6a700'];
-const BRAND_COLORS = { orange: '#ff7900', africell: '#8e24aa', qcell: '#5b2d8e', sierratel: '#00a3e0' };
-const opColor = (name, i) =>
-  BRAND_COLORS[String(name).toLowerCase().replace(/\s+/g, '')] ?? OP_COLORS[i % OP_COLORS.length];
+const opColor = colorFor;
 
 const PRESETS = [
   { label: 'All',    days: null },

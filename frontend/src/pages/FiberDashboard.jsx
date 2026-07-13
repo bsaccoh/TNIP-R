@@ -23,8 +23,9 @@ import 'leaflet/dist/leaflet.css';
 import { get } from '../api/client';
 import { Loading, EmptyState } from '../components/ui';
 import { useColorMode } from '../theme/ColorMode';
+import { colorFor, OP_FALLBACK_PALETTE } from '../theme';
 
-const OP_COLORS = ['#f97316', '#4c8ef7', '#22c55e', '#a855f7'];
+const OP_COLORS = OP_FALLBACK_PALETTE;
 const SEV_COLOR = { CRITICAL: 'error', MAJOR: 'warning', MINOR: 'info' };
 const SEV_ICON  = { CRITICAL: 'error', MAJOR: 'warning', MINOR: 'info' };
 
@@ -314,7 +315,7 @@ export default function FiberDashboard() {
 
   const opColorMap = useMemo(() => {
     const map = {};
-    operators.forEach((op, i) => { map[op.operator_name] = OP_COLORS[i % OP_COLORS.length]; });
+    operators.forEach((op, i) => { map[op.operator_name] = colorFor(op.operator_name, i); });
     return map;
   }, [operators]);
 
