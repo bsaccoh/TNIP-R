@@ -3,9 +3,11 @@ import {
   Box, Typography, Paper, Button, TextField, MenuItem,
   Select, InputLabel, FormControl, Grid, Stack, Chip,
   CircularProgress, Alert, AlertTitle, Stepper, Step, StepLabel,
+  useTheme,
 } from '@mui/material';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import axios from 'axios';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -35,17 +37,21 @@ const SEVERITIES = [
 ];
 
 export default function ReportIssue() {
+  const theme = useTheme();
   const [operators, setOperators] = useState([]);
   const [step, setStep]           = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(null);
   const [err, setErr]               = useState('');
+  const [gpsStatus, setGpsStatus]   = useState('idle'); // idle | loading | success | error
+  const [gpsError, setGpsError]     = useState('');
 
   const [form, setForm] = useState({
     operatorId: '', issueType: '', severity: 'MEDIUM',
     district: '', areaDetail: '', technology: '',
     description: '',
     reporterName: '', reporterPhone: '', reporterEmail: '',
+    latitude: null, longitude: null,
   });
 
   useEffect(() => {
@@ -55,6 +61,36 @@ export default function ReportIssue() {
   }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      setGpsError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsStatus('loading');
+    setGpsError('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((f) => ({
+          ...f,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }));
+        setGpsStatus('success');
+      },
+      (err) => {
+        setGpsStatus('error');
+        const msgs = {
+          1: 'Location permission denied. Please allow location access and try again.',
+          2: 'Unable to determine your location. Please try again.',
+          3: 'Location request timed out. Please try again.',
+        };
+        setGpsError(msgs[err.code] || 'Failed to get location.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
 
   const canStep1 = form.issueType && form.operatorId && form.district;
 
@@ -73,7 +109,7 @@ export default function ReportIssue() {
 
   if (submitted) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5', display: 'flex',
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex',
                  alignItems: 'center', justifyContent: 'center', p: 2 }}>
         <Paper sx={{ p: 4, maxWidth: 500, width: '100%', textAlign: 'center' }}>
           <CheckCircleIcon sx={{ fontSize: 72, color: '#2e7d32', mb: 2 }} />
@@ -86,13 +122,19 @@ export default function ReportIssue() {
           </Typography>
           <Chip label={`Ref: ${submitted.complaint_ref}`}
                 sx={{ fontFamily: 'monospace', fontSize: '1rem', px: 2, py: 1, mb: 3 }} />
-          <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 3 }}>
-            Save your reference number for follow-up queries.
+          <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 2 }}>
+            Save your reference number to track your complaint status.
           </Typography>
+          <Button variant="outlined" href={`/track?ref=${submitted.complaint_ref}`}
+            sx={{ mb: 2 }} fullWidth>
+            Track My Complaint
+          </Button>
           <Button variant="contained" onClick={() => { setSubmitted(null); setStep(0);
+            setGpsStatus('idle'); setGpsError('');
             setForm({ operatorId:'', issueType:'', severity:'MEDIUM', district:'',
                       areaDetail:'', technology:'', description:'',
-                      reporterName:'', reporterPhone:'', reporterEmail:'' }); }}>
+                      reporterName:'', reporterPhone:'', reporterEmail:'',
+                      latitude: null, longitude: null }); }}>
             Submit Another Report
           </Button>
         </Paper>
@@ -101,7 +143,7 @@ export default function ReportIssue() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* Header */}
       <Box sx={{ background: 'linear-gradient(135deg,#0d47a1,#1976d2)', py: 4, px: 2, color: '#fff', textAlign: 'center' }}>
         <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
@@ -162,6 +204,33 @@ export default function ReportIssue() {
                 placeholder="e.g. Lumley Beach Road, near Total petrol station"
                 value={form.areaDetail} onChange={set('areaDetail')} />
 
+              <Box>
+                <Button
+                  variant={gpsStatus === 'success' ? 'contained' : 'outlined'}
+                  color={gpsStatus === 'success' ? 'success' : 'primary'}
+                  startIcon={gpsStatus === 'loading' ? <CircularProgress size={18} /> : <MyLocationIcon />}
+                  onClick={detectLocation}
+                  disabled={gpsStatus === 'loading'}
+                  fullWidth
+                  sx={{ py: 1.5 }}
+                >
+                  {gpsStatus === 'idle' && 'Use My Current Location'}
+                  {gpsStatus === 'loading' && 'Detecting Location...'}
+                  {gpsStatus === 'success' && `Location Detected (${form.latitude.toFixed(4)}, ${form.longitude.toFixed(4)})`}
+                  {gpsStatus === 'error' && 'Retry Location Detection'}
+                </Button>
+                {gpsStatus === 'success' && (
+                  <Typography variant="caption" color="success.main" sx={{ mt: 0.5, display: 'block' }}>
+                    GPS coordinates will be attached to your report for precise network mapping.
+                  </Typography>
+                )}
+                {gpsStatus === 'error' && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                    {gpsError}
+                  </Typography>
+                )}
+              </Box>
+
               <FormControl fullWidth>
                 <InputLabel>How severe is the problem?</InputLabel>
                 <Select value={form.severity} label="How severe is the problem?"
@@ -221,6 +290,7 @@ export default function ReportIssue() {
                 { label: 'Issue',       value: ISSUE_TYPES.find((t) => t.value === form.issueType)?.label },
                 { label: 'District',    value: form.district },
                 { label: 'Location',    value: form.areaDetail || '—' },
+                { label: 'GPS',         value: form.latitude ? `${form.latitude.toFixed(5)}, ${form.longitude.toFixed(5)}` : 'Not provided' },
                 { label: 'Severity',    value: SEVERITIES.find((s) => s.value === form.severity)?.label },
                 { label: 'Description', value: form.description || '—' },
               ].map(({ label, value }) => (

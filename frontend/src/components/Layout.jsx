@@ -58,9 +58,11 @@ import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import FeedIcon from '@mui/icons-material/Feed';
 import FactCheckIcon2 from '@mui/icons-material/RuleFolder';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
-import TimelineIcon from '@mui/icons-material/Timeline';
+import TimelineIcon    from '@mui/icons-material/Timeline';
+import LocationOffIcon from '@mui/icons-material/LocationOff';
 import { useAuth } from '../auth/AuthContext';
 import { useColorMode } from '../theme/ColorMode';
+import { useSettings } from '../contexts/SettingsContext';
 import NotificationsBell from './NotificationsBell';
 
 const FULL = 248;
@@ -140,6 +142,13 @@ const NAV = [
       { to: '/drive-test-campaigns', label: 'Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
       { to: '/field', label: 'Field App', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
       { to: '/drive-test-analytics', label: 'DT Analytics', icon: <QueryStatsIcon /> },
+      { to: '/drive-test-executive', label: 'DT Executive', icon: <AssessmentIcon /> },
+      { to: '/drive-test-comparison', label: 'DT Comparison', icon: <CompareArrowsIcon /> },
+      { to: '/drive-test-regional', label: 'DT Regional', icon: <MapIcon /> },
+      { to: '/drive-test-trend',      label: 'DT Trend',      icon: <TimelineIcon />     },
+      { to: '/drive-test-blackspots', label: 'Dead Zones',     icon: <LocationOffIcon />  },
+      { to: '/drive-test-corridor',   label: 'DT Corridor',   icon: <RouteIcon />        },
+      { to: '/drive-test-pci',        label: 'PCI Analysis',  icon: <WifiTetheringIcon />},
       { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
     ],
   },
@@ -234,6 +243,7 @@ export default function Layout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { mode, toggle } = useColorMode();
+  const { platformName, regulatorName } = useSettings();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(!isMobile);
@@ -251,8 +261,8 @@ export default function Layout() {
         <CellTowerIcon color="primary" />
         {expanded && (
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" lineHeight={1}>TNIP-R</Typography>
-            <Typography variant="caption" color="text.secondary">Regulatory Intelligence</Typography>
+            <Typography variant="h6" lineHeight={1}>{platformName}</Typography>
+            <Typography variant="caption" color="text.secondary">{regulatorName}</Typography>
           </Box>
         )}
         {!isMobile && (
@@ -391,7 +401,7 @@ export default function Layout() {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" color="text.primary" noWrap>{current?.label || 'TNIP-R'}</Typography>
+          <Typography variant="h6" color="text.primary" noWrap>{current?.label || platformName}</Typography>
           <Box sx={{ flex: 1 }} />
 
           {/* User + clock */}

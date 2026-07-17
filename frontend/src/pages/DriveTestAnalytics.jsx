@@ -250,7 +250,18 @@ function CompareTab({ tests, tileVariant }) {
                       <Chip label={d.meta.operator_name} size="small"
                         sx={{ bgcolor: alpha(OP_PAIR_COLORS[idx], 0.15), color: OP_PAIR_COLORS[idx], fontWeight: 700 }} />
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>{d.meta.test_name}</Typography>
+                      {d.meta.overall_score && (
+                        <Chip label={`Score: ${d.meta.overall_score}`} size="small" color="primary" sx={{ fontWeight: 'bold' }} />
+                      )}
                     </Stack>
+                    
+                    {d.meta.ai_summary && (
+                      <Alert severity="info" icon={false} sx={{ mb: 2, '& .MuiAlert-message': { p: 0 } }}>
+                        <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                          <strong style={{ color: OP_PAIR_COLORS[idx] }}>AI Summary:</strong> {d.meta.ai_summary}
+                        </Typography>
+                      </Alert>
+                    )}
 
                     <Grid container spacing={1} mb={2}>
                       <Grid item xs={4}>
@@ -963,6 +974,8 @@ function getDateRange(preset) {
     case 'week':    { const d = new Date(today); d.setDate(d.getDate() - 7);    return { from: fmt(d), to: fmt(today) }; }
     case 'month':   { const d = new Date(today); d.setMonth(d.getMonth() - 1);  return { from: fmt(d), to: fmt(today) }; }
     case '3months': { const d = new Date(today); d.setMonth(d.getMonth() - 3);  return { from: fmt(d), to: fmt(today) }; }
+    case 'year':    { const d = new Date(today); d.setFullYear(d.getFullYear() - 1); return { from: fmt(d), to: fmt(today) }; }
+    case 'all':     return { from: '', to: '' };
     default: return { from: '', to: '' };
   }
 }
@@ -980,7 +993,7 @@ export default function DriveTestAnalytics() {
   const [allTests,   setAllTests]   = useState(null);
   const [operators,  setOperators]  = useState([]);
   const [filterOp,   setFilterOp]   = useState('all');
-  const [datePreset, setDatePreset] = useState('3months');
+  const [datePreset, setDatePreset] = useState('all');
   const [dateFrom,   setDateFrom]   = useState('');
   const [dateTo,     setDateTo]     = useState('');
   const { mode } = useColorMode();
@@ -1082,13 +1095,13 @@ export default function DriveTestAnalytics() {
 
             <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
 
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <CalendarTodayIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-              {['day', 'week', 'month', '3months', 'custom'].map((p) => (
-                <Chip key={p} label={p === '3months' ? '3 Months' : p.charAt(0).toUpperCase() + p.slice(1)}
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+              <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              {['day', 'week', 'month', '3months', 'year', 'all', 'custom'].map((p) => (
+                <Chip key={p} label={p === '3months' ? '3M' : p === 'all' ? 'All' : p === 'year' ? '1Y' : p.charAt(0).toUpperCase() + p.slice(1)}
                   size="small" clickable onClick={() => setDatePreset(p)}
                   sx={{
-                    fontWeight: 600, fontSize: 11,
+                    fontWeight: 600, fontSize: 11, height: 24, px: 0.5,
                     bgcolor: datePreset === p ? alpha('#3da9fc', 0.15) : 'transparent',
                     color: datePreset === p ? '#3da9fc' : 'text.secondary',
                     border: `1px solid ${datePreset === p ? alpha('#3da9fc', 0.4) : 'transparent'}`,

@@ -26,6 +26,13 @@ router.get('/operators', asyncHandler(async (_req, res) => {
   ok(res, ops);
 }));
 
+// Public complaint tracking by reference number
+router.get('/track/:ref', asyncHandler(async (req, res) => {
+  const complaint = await svc.trackComplaint(req.params.ref);
+  if (!complaint) throw ApiError.badRequest('Complaint not found. Please check your reference number.');
+  ok(res, complaint);
+}));
+
 /* ── Authenticated — regulator / analyst ─────────────────────────────────── */
 const canRead  = requireAccess({ permissions: ['compliance:read'] });
 const canWrite = requireAccess({ permissions: ['compliance:write'] });

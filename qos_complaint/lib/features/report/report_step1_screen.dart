@@ -35,6 +35,8 @@ class _ReportStep1ScreenState extends ConsumerState<ReportStep1Screen> {
     {"label": "Slow Internet", "icon": Icons.speed_rounded},
     {"label": "No Internet", "icon": Icons.wifi_off_rounded},
     {"label": "SMS Not Sending", "icon": Icons.sms_failed_rounded},
+    {"label": "Billing Dispute", "icon": Icons.receipt_long_rounded},
+    {"label": "Mobile Money", "icon": Icons.account_balance_wallet_rounded},
     {"label": "Other Issue", "icon": Icons.more_horiz_rounded},
   ];
 
@@ -317,8 +319,13 @@ class _ReportStep1ScreenState extends ConsumerState<ReportStep1Screen> {
           onPressed: () {
             // Commit text description details
             ref.read(draftReportProvider.notifier).updateDescription(_explainController.text);
-            // Navigate to step 2 location
-            context.push('/report/location');
+            // Route billing/mobile money complaints through billing details form
+            final draft = ref.read(draftReportProvider);
+            if (draft.isBillingType) {
+              context.push('/report/billing-details');
+            } else {
+              context.push('/report/location');
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryBlue,

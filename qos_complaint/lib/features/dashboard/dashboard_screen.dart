@@ -6,14 +6,41 @@ import '../../app/theme/app_theme.dart';
 import '../../app/providers/state_providers.dart';
 import '../../core/models/app_models.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
+bool _hasShownNewsPopup = false;
+
 class DashboardScreen extends ConsumerWidget {
   final Function(int) onTabChanged;
 
   const DashboardScreen({super.key, required this.onTabChanged});
 
+  Future<void> _sendSms(String body) async {
+    final Uri smsUri = Uri(
+      scheme: 'sms',
+      path: '1234',
+      queryParameters: <String, String>{
+        'body': body,
+      },
+    );
+    if (await canLaunchUrl(smsUri)) {
+      await launchUrl(smsUri);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!_hasShownNewsPopup) {
+      _hasShownNewsPopup = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          _showNewsPopup(context);
+        }
+      });
+    }
+
     final complaints = ref.watch(complaintsProvider);
+    final offlineComplaints = complaints.where((c) => c.status == 'QUEUED').toList();
     final notifications = ref.watch(notificationsProvider);
     final unreadCount = notifications.where((n) => n.isUnread).length;
 
@@ -65,6 +92,51 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Offline Complaints Banner
+            if (offlineComplaints.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.errorRed.withOpacity(0.1),
+                  border: Border.all(color: AppColors.errorRed.withOpacity(0.5)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: AppColors.errorRed),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Offline Complaints (${offlineComplaints.length})", 
+                            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold, color: AppColors.errorRed)),
+                          const SizedBox(height: 4),
+                          Text("Your recent complaints are queued. Send via SMS now to avoid delays.", 
+                            style: AppTextStyles.small.copyWith(color: AppColors.errorRed)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sms_rounded, color: AppColors.errorRed),
+                      onPressed: () {
+                        // Launch SMS with short summary of the first offline complaint
+                        final draft = offlineComplaints.first;
+                        _sendSms("NatCA QoS: ${draft.operatorName}, ${draft.issueType}, ${draft.district} - [${draft.reference}]");
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sync_rounded, color: AppColors.errorRed),
+                      onPressed: () {
+                        ref.read(complaintsProvider.notifier).syncOfflineComplaints();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // Hero Banner Card
             _buildHeroCard(context),
             const SizedBox(height: 24),
@@ -72,15 +144,23 @@ class DashboardScreen extends ConsumerWidget {
             // Quick Actions
             Text("Quick Actions", style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Row(
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.9,
               children: [
                 _quickActionItem(context, Icons.map_outlined, "Check Coverage", AppColors.primaryBlue, () => onTabChanged(1)),
-                const SizedBox(width: 10),
                 _quickActionItem(context, Icons.analytics_outlined, "Network Status", AppColors.accentGreen, () => context.push('/network-status')),
-                const SizedBox(width: 10),
                 _quickActionItem(context, Icons.assignment_outlined, "My Complaints", AppColors.warningOrange, () => onTabChanged(3)),
-                const SizedBox(width: 10),
-                _quickActionItem(context, Icons.help_outline_rounded, "Help Center", AppColors.closedGrey, () {}),
+                _quickActionItem(context, Icons.newspaper_rounded, "Latest News", AppColors.errorRed, () => context.push('/latest-news')),
+                _quickActionItem(context, Icons.gavel_rounded, "Rights", AppColors.closedGrey, () => context.push('/knowledge-base')),
+                _quickActionItem(context, Icons.compare_arrows_rounded, "Tariffs", AppColors.primaryBlue, () => context.push('/tariffs')),
+                _quickActionItem(context, Icons.badge_outlined, "SIM Check", AppColors.accentGreen, () => context.push('/sim-check')),
+                _quickActionItem(context, Icons.emergency, "Emergency Codes", AppColors.warningOrange, () => context.push('/ussd')),
+                _quickActionItem(context, Icons.smart_toy_rounded, "AI Assistant", AppColors.primaryBlue, () => context.push('/chatbot')),
               ],
             ),
             const SizedBox(height: 24),
@@ -199,35 +279,96 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _quickActionItem(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.dynamicCard,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.dynamicBorder),
-            boxShadow: const [
-              BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+  void _showNewsPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.dynamicCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.newspaper_rounded, color: AppColors.primaryBlue),
+              const SizedBox(width: 10),
+              Text("Latest News", style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold)),
             ],
           ),
-          child: Column(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 28, color: color),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Regulation",
+                  style: AppTextStyles.micro.copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "New Tariff Change Approved",
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               Text(
-                label,
-                style: AppTextStyles.micro.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
+                "NatCA has approved a new ceiling tariff for voice and SMS services across all operators to standardize rates and protect consumers.",
+                style: AppTextStyles.small.copyWith(color: AppColors.textSecondary, height: 1.4),
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Close", style: TextStyle(color: AppColors.textLight)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.push('/latest-news');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text("Read More", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _quickActionItem(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.dynamicCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.dynamicBorder),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 28, color: color),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: AppTextStyles.micro.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

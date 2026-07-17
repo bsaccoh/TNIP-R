@@ -13,6 +13,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { get, put } from '../api/client';
 import { Loading } from '../components/ui';
+import { useSettings } from '../contexts/SettingsContext';
 import Sftp from './Sftp';
 
 const TIMEZONES = [
@@ -222,6 +223,7 @@ export default function Settings() {
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const { reload: reloadSettings } = useSettings();
 
   useEffect(() => {
     get('/settings').then((r) => setCfg(r.data)).catch(() => setCfg({}));
@@ -233,6 +235,7 @@ export default function Settings() {
       const r = await put('/settings', cfg);
       setCfg(r.data);
       setMsg({ type: 'success', text: 'Settings saved.' });
+      reloadSettings();
     } catch (e) {
       setMsg({ type: 'error', text: e?.response?.data?.error?.message || 'Save failed.' });
     } finally {

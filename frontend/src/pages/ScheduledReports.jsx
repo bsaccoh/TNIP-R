@@ -30,6 +30,7 @@ const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Satur
 const TYPE_LABELS = {
   kpi: 'KPI Performance', compliance: 'Compliance Status',
   trend: 'KPI Trend', anomaly: 'Anomaly Detection',
+  drive_test: 'Drive Test Campaign',
 };
 
 /* ── Schedule Dialog ─────────────────────────────────────────────────────── */

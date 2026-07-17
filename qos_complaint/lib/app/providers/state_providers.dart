@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/app_models.dart';
 import '../theme/app_theme.dart';
 
@@ -31,6 +32,11 @@ class DraftReport {
   final double lat;
   final double lng;
   final List<String> attachments;
+  // Billing & Mobile Money fields
+  final String? billingSubCategory;
+  final String? transactionRef;
+  final double? disputedAmount;
+  final String? transactionDate;
 
   const DraftReport({
     this.issueType = "Call Drops",
@@ -42,7 +48,14 @@ class DraftReport {
     this.lat = 8.1189,
     this.lng = -11.1963,
     this.attachments = const [],
+    this.billingSubCategory,
+    this.transactionRef,
+    this.disputedAmount,
+    this.transactionDate,
   });
+
+  bool get isBillingType =>
+      issueType == 'Billing Dispute' || issueType == 'Mobile Money';
 
   DraftReport copyWith({
     String? issueType,
@@ -54,6 +67,10 @@ class DraftReport {
     double? lat,
     double? lng,
     List<String>? attachments,
+    String? billingSubCategory,
+    String? transactionRef,
+    double? disputedAmount,
+    String? transactionDate,
   }) {
     return DraftReport(
       issueType: issueType ?? this.issueType,
@@ -65,6 +82,10 @@ class DraftReport {
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       attachments: attachments ?? this.attachments,
+      billingSubCategory: billingSubCategory ?? this.billingSubCategory,
+      transactionRef: transactionRef ?? this.transactionRef,
+      disputedAmount: disputedAmount ?? this.disputedAmount,
+      transactionDate: transactionDate ?? this.transactionDate,
     );
   }
 }
@@ -79,6 +100,11 @@ class DraftReportNotifier extends StateNotifier<DraftReport> {
       state = state.copyWith(areaDetail: street, district: city, lat: lat, lng: lng);
   void addAttachment(String path) => state = state.copyWith(attachments: [...state.attachments, path]);
   void clearAttachments() => state = state.copyWith(attachments: const []);
+  // Billing & Mobile Money setters
+  void updateBillingSubCategory(String val) => state = state.copyWith(billingSubCategory: val);
+  void updateTransactionRef(String val) => state = state.copyWith(transactionRef: val);
+  void updateDisputedAmount(double val) => state = state.copyWith(disputedAmount: val);
+  void updateTransactionDate(String val) => state = state.copyWith(transactionDate: val);
   void reset() => state = const DraftReport();
 }
 
@@ -144,8 +170,12 @@ class ComplaintsNotifier extends StateNotifier<List<ComplaintItem>> {
       areaDetail: draft.areaDetail,
       lat: draft.lat,
       lng: draft.lng,
-      status: 'NEW',
+      status: 'QUEUED',
       createdAt: dateStr,
+      billingSubCategory: draft.billingSubCategory,
+      transactionRef: draft.transactionRef,
+      disputedAmount: draft.disputedAmount,
+      transactionDate: draft.transactionDate,
     );
 
     // Save locally
@@ -162,17 +192,109 @@ class ComplaintsNotifier extends StateNotifier<List<ComplaintItem>> {
         'lat': draft.lat,
         'lng': draft.lng,
         'description': draft.description,
+        if (draft.isBillingType) ...{
+          'billing_sub_category': draft.billingSubCategory,
+          'transaction_ref': draft.transactionRef,
+          'disputed_amount': draft.disputedAmount,
+          'transaction_date': draft.transactionDate,
+        },
       };
 
-      await http.post(
+      final response = await http.post(
         Uri.parse('$_baseUrl/submit'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(body),
-      ).timeout(const Duration(milliseconds: 1500));
-    } catch (_) {
-      // Offline resilient submission: stored on device locally
+      ).timeout(const Duration(milliseconds: 2000));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Update local status to NEW instead of QUEUED
+        state = [
+          newItem.copyWith(status: 'NEW'),
+          ...state.where((e) => e.id != newItem.id),
+        ];
+        return true;
+      } else {
+        await _queueOfflineComplaint(newItem);
+        return false;
+      }
+    } catch (e) {
+      // Network error, queue it
+      await _queueOfflineComplaint(newItem);
+      return false; // False means it didn't sync immediately
     }
-    return true;
+  }
+
+  Future<void> _queueOfflineComplaint(ComplaintItem item) async {
+    final prefs = await SharedPreferences.getInstance();
+    final queuedStrs = prefs.getStringList('offline_complaints') ?? [];
+    queuedStrs.add(json.encode(item.toJson()));
+    await prefs.setStringList('offline_complaints', queuedStrs);
+  }
+
+  Future<List<ComplaintItem>> getOfflineComplaints() async {
+    final prefs = await SharedPreferences.getInstance();
+    final queuedStrs = prefs.getStringList('offline_complaints') ?? [];
+    return queuedStrs.map((s) => ComplaintItem.fromJson(json.decode(s))).toList();
+  }
+
+  Future<void> clearOfflineComplaints() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('offline_complaints');
+    
+    // Remove QUEUED items from local state (optional, if we are clearing them manually)
+    state = state.where((e) => e.status != 'QUEUED').toList();
+  }
+
+  Future<bool> syncOfflineComplaints() async {
+    final offlineItems = await getOfflineComplaints();
+    if (offlineItems.isEmpty) return true;
+
+    bool allSynced = true;
+    for (var item in offlineItems) {
+      // Try to sync each
+      try {
+        final body = {
+          'operator_id': item.operatorId,
+          'issue_type': item.issueType,
+          'severity': 'MEDIUM',
+          'district': item.district,
+          'area_detail': item.areaDetail,
+          'lat': item.lat,
+          'lng': item.lng,
+          'description': item.description,
+          if (item.isBillingComplaint) ...{
+            'billing_sub_category': item.billingSubCategory,
+            'transaction_ref': item.transactionRef,
+            'disputed_amount': item.disputedAmount,
+            'transaction_date': item.transactionDate,
+          },
+        };
+
+        final response = await http.post(
+          Uri.parse('$_baseUrl/submit'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(body),
+        ).timeout(const Duration(milliseconds: 2000));
+        
+        if (response.statusCode != 200 && response.statusCode != 201) {
+          allSynced = false;
+        } else {
+          // Update local status
+          state = state.map((e) {
+            if (e.id == item.id) return e.copyWith(status: 'NEW');
+            return e;
+          }).toList();
+        }
+      } catch (_) {
+        allSynced = false;
+      }
+    }
+
+    if (allSynced) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('offline_complaints');
+    }
+    return allSynced;
   }
 
   String _getOperatorName(int id) {
@@ -294,4 +416,28 @@ class NotificationsNotifier extends StateNotifier<List<NotificationItem>> {
 
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, List<NotificationItem>>((ref) {
   return NotificationsNotifier();
+});
+
+// ── 5. SPEED TEST HISTORY STATE ──────────────────────────────────────────────
+class SpeedTestHistoryNotifier extends StateNotifier<List<SpeedTestResult>> {
+  SpeedTestHistoryNotifier() : super([]) {
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> saved = prefs.getStringList('speed_test_history') ?? [];
+    state = saved.map((s) => SpeedTestResult.fromJson(json.decode(s))).toList();
+  }
+
+  Future<void> addResult(SpeedTestResult result) async {
+    state = [result, ...state];
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> saved = state.map((r) => json.encode(r.toJson())).toList();
+    await prefs.setStringList('speed_test_history', saved);
+  }
+}
+
+final speedTestHistoryProvider = StateNotifierProvider<SpeedTestHistoryNotifier, List<SpeedTestResult>>((ref) {
+  return SpeedTestHistoryNotifier();
 });

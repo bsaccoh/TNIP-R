@@ -19,7 +19,14 @@ import PmKpiDashboard from './pages/PmKpiDashboard';
 import Reports from './pages/Reports';
 import DriveTest from './pages/DriveTest';
 import DriveTestAnalytics from './pages/DriveTestAnalytics';
+import DriveTestExecutiveReport from './pages/DriveTestExecutiveReport';
+import OperatorComparisonDashboard from './pages/OperatorComparisonDashboard';
 import DriveTestConfig from './pages/DriveTestConfig';
+import DriveTestRegional from './pages/DriveTestRegional';
+import DriveTestTrend      from './pages/DriveTestTrend';
+import DriveTestBlackspots from './pages/DriveTestBlackspots';
+import DriveTestCorridor   from './pages/DriveTestCorridor';
+import DriveTestPci        from './pages/DriveTestPci';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
@@ -41,6 +48,7 @@ import ApiGateway from './pages/ApiGateway';
 import RealtimeMonitor from './pages/RealtimeMonitor';
 import ConsumerQoE from './pages/ConsumerQoE';
 import ReportIssue from './pages/ReportIssue';
+import TrackComplaint from './pages/TrackComplaint';
 import PredictiveAnalytics from './pages/PredictiveAnalytics';
 import SpectrumManagement from './pages/SpectrumManagement';
 import FieldApp from './pages/FieldApp';
@@ -74,6 +82,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/report" element={<ReportIssue />} />
+      <Route path="/track" element={<TrackComplaint />} />
       <Route path="/field" element={<FieldApp />} />
       <Route
         path="/"
@@ -96,6 +105,13 @@ function AppRoutes() {
         <Route path="drive-test" element={<DriveTest />} />
         <Route path="drive-test-campaigns" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','REGULATOR_ANALYST','DRIVE_TEST_USER']}><DriveTestCampaigns /></RoleGuard>} />
         <Route path="drive-test-analytics" element={<DriveTestAnalytics />} />
+        <Route path="drive-test-executive" element={<DriveTestExecutiveReport />} />
+        <Route path="drive-test-comparison" element={<OperatorComparisonDashboard />} />
+        <Route path="drive-test-regional" element={<DriveTestRegional />} />
+        <Route path="drive-test-trend"      element={<DriveTestTrend />} />
+        <Route path="drive-test-blackspots" element={<DriveTestBlackspots />} />
+        <Route path="drive-test-corridor"   element={<DriveTestCorridor />} />
+        <Route path="drive-test-pci"        element={<DriveTestPci />} />
         <Route path="drive-test-config" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','DRIVE_TEST_USER']}><DriveTestConfig /></RoleGuard>} />
         <Route path="users" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['users:write']}><Users /></RoleGuard>} />
         <Route path="settings" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Settings /></RoleGuard>} />

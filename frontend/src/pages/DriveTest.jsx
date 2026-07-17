@@ -4,7 +4,7 @@ import {
   Box, Card, CardContent, Typography, Button, Stack, Grid, Chip, Alert,
   FormControl, InputLabel, Select, MenuItem, TextField, Dialog, DialogTitle,
   DialogContent, DialogActions, Table, TableHead, TableBody, TableRow, TableCell,
-  IconButton, Tooltip, LinearProgress, Divider, TablePagination,
+  IconButton, Tooltip, LinearProgress, CircularProgress, Divider, TablePagination,
   ToggleButtonGroup, ToggleButton, Slider,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -254,18 +254,65 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
   const [technology, setTechnology] = useState('4G');
   const [deviceModel, setDeviceModel] = useState('');
   const [testerName, setTesterName] = useState('');
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detected, setDetected] = useState(null);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
+  const isBatch = files.length > 1;
+
+  const handleFilesSelected = async (selectedFiles) => {
+    setFiles(selectedFiles);
+    setResult(null);
+    setError('');
+    setDetected(null);
+    if (!selectedFiles.length) return;
+
+    const hasTrp = selectedFiles.some((f) => f.name.toLowerCase().endsWith('.trp'));
+    if (!hasTrp) return;
+
+    setDetecting(true);
+    try {
+      const fd = new FormData();
+      for (const f of selectedFiles) fd.append('file', f);
+      const token = localStorage.getItem('tnipr_access');
+      const res = await fetch(`${BASE}/drive-tests/preview`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error('Preview failed');
+      const json = await res.json();
+      const previews = json.data || [];
+      setDetected(previews);
+
+      const first = previews.find((p) => !p.error);
+      if (!first) return;
+
+      if (first.technology) setTechnology(first.technology);
+      if (first.testDate) setTestDate(first.testDate);
+      if (first.device) setDeviceModel(first.device);
+      if (first.testName && selectedFiles.length === 1) setTestName(first.testName);
+
+      if (first.operator) {
+        const match = operators.find((o) =>
+          o.operator_name.toLowerCase().includes(first.operator.split(' ')[0].toLowerCase()));
+        if (match) setOpId(match.operator_id);
+      }
+    } catch {}
+    finally { setDetecting(false); }
+  };
+
   const handleUpload = async () => {
-    if (!opId || !file) { setError('Select operator and file'); return; }
-    setUploading(true); setError(''); setResult(null);
+    if (!opId || !files.length) { setError('Select operator and at least one file'); return; }
+    setUploading(true); setError(''); setResult(null); setProgress(0);
     const fd = new FormData();
-    fd.append('file', file);
+    for (const f of files) fd.append('file', f);
     fd.append('operator_id', opId);
-    fd.append('test_name', testName || file.name);
+    fd.append('test_name', testName);
     fd.append('test_date', testDate);
     fd.append('route_type', routeType);
     fd.append('technology', technology);
@@ -274,32 +321,84 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
 
     try {
       const token = localStorage.getItem('tnipr_access');
-      const res = await fetch(`${BASE}/drive-tests/import`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
+      const xhr = new XMLHttpRequest();
+      const response = await new Promise((resolve, reject) => {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          try { resolve({ status: xhr.status, data: JSON.parse(xhr.responseText) }); }
+          catch { reject(new Error('Invalid server response')); }
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.open('POST', `${BASE}/drive-tests/import`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(fd);
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Upload failed');
-      setResult(json.data);
+      if (response.status >= 400) throw new Error(response.data.message || 'Upload failed');
+      setResult(response.data.data);
       onUploaded();
     } catch (err) { setError(err.message); }
     finally { setUploading(false); }
   };
+
+  const fileLabel = files.length === 0
+    ? 'Select Files (CSV, Excel, or TEMS .trp)'
+    : files.length === 1
+      ? files[0].name
+      : `${files.length} files selected`;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Upload Drive Test Data</DialogTitle>
       <DialogContent>
         <Stack spacing={2} mt={1}>
+          <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} fullWidth>
+            {fileLabel}
+            <input type="file" hidden multiple accept=".csv,.xlsx,.xls,.trp"
+              onChange={(e) => handleFilesSelected(Array.from(e.target.files || []))} />
+          </Button>
+          {detecting && (
+            <Alert severity="info" icon={<CircularProgress size={18} />}>
+              Reading file metadata...
+            </Alert>
+          )}
+          {detected && !detecting && (
+            <Alert severity="success" variant="outlined" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+              <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block' }}>
+                Auto-detected from {detected.filter((d) => !d.error).length} file(s):
+              </Typography>
+              {detected.filter((d) => !d.error).slice(0, 3).map((d, i) => (
+                <Typography key={i} variant="caption" display="block" sx={{ color: 'text.secondary' }}>
+                  {d.filename}: {[d.operator, d.device, d.technology].filter(Boolean).join(' · ')}
+                </Typography>
+              ))}
+              {detected.filter((d) => !d.error).length > 3 && (
+                <Typography variant="caption" color="text.disabled">
+                  +{detected.filter((d) => !d.error).length - 3} more
+                </Typography>
+              )}
+            </Alert>
+          )}
+          {files.length > 1 && !detected && (
+            <Box sx={{ maxHeight: 120, overflow: 'auto', px: 1 }}>
+              {files.map((f, i) => (
+                <Typography key={i} variant="caption" display="block" noWrap sx={{ color: 'text.secondary' }}>
+                  {i + 1}. {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                </Typography>
+              ))}
+            </Box>
+          )}
           <FormControl fullWidth size="small" required>
             <InputLabel>Operator</InputLabel>
             <Select label="Operator" value={opId} onChange={(e) => setOpId(e.target.value)}>
               {operators.map((o) => <MenuItem key={o.operator_id} value={o.operator_id}>{o.operator_name}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" label="Test Name" value={testName} onChange={(e) => setTestName(e.target.value)}
-            placeholder="e.g. Western Area LTE Coverage" fullWidth />
+          {!isBatch && (
+            <TextField size="small" label="Test Name" value={testName} onChange={(e) => setTestName(e.target.value)}
+              placeholder="e.g. Western Area LTE Coverage" fullWidth />
+          )}
           <Stack direction="row" spacing={2}>
             <TextField size="small" label="Test Date" type="date" InputLabelProps={{ shrink: true }}
               value={testDate} onChange={(e) => setTestDate(e.target.value)} fullWidth />
@@ -324,24 +423,50 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
           </Stack>
           <TextField size="small" label="Tester Name" value={testerName}
             onChange={(e) => setTesterName(e.target.value)} fullWidth />
-          <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} fullWidth>
-            {file ? file.name : 'Select CSV / Excel File'}
-            <input type="file" hidden accept=".csv,.xlsx,.xls" onChange={(e) => setFile(e.target.files[0])} />
-          </Button>
-          {uploading && <LinearProgress />}
+          {uploading && <LinearProgress variant={progress > 0 ? 'determinate' : 'indeterminate'} value={progress} />}
           {error && <Alert severity="error">{error}</Alert>}
-          {result && (
+          {/* Single file result */}
+          {result && !result.batch && (
             <Alert severity="success">
               Imported {result.samplesImported} samples ({result.distanceKm} km route).
               {result.samplesSkipped > 0 && ` ${result.samplesSkipped} rows skipped (no GPS).`}
+              {result.format === 'TRP' && result.device && ` Device: ${result.device}.`}
+              {result.format === 'TRP' && result.operator && ` Operator: ${result.operator}.`}
+              {result.format === 'TRP' && result.durationMin != null && ` Duration: ${result.durationMin} min.`}
             </Alert>
+          )}
+          {/* Batch result */}
+          {result?.batch && (
+            <Stack spacing={1}>
+              <Alert severity={result.failed === 0 ? 'success' : result.succeeded === 0 ? 'error' : 'warning'}>
+                Batch complete: {result.succeeded}/{result.total} files imported
+                {result.failed > 0 && `, ${result.failed} failed`}.
+              </Alert>
+              <Box sx={{ maxHeight: 160, overflow: 'auto' }}>
+                {result.results.map((r, i) => (
+                  <Stack key={i} direction="row" spacing={1} alignItems="center"
+                    sx={{ py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
+                    <Chip size="small" label={r.status === 'success' ? 'OK' : 'FAIL'}
+                      color={r.status === 'success' ? 'success' : 'error'} sx={{ minWidth: 48 }} />
+                    <Typography variant="caption" noWrap sx={{ flex: 1 }}>
+                      {r.filename}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {r.status === 'success'
+                        ? `${r.samplesImported} samples`
+                        : r.message?.slice(0, 60)}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Box>
+            </Stack>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        <Button variant="contained" onClick={handleUpload} disabled={uploading || !opId || !file}>
-          {uploading ? 'Uploading...' : 'Upload & Process'}
+        <Button variant="contained" onClick={handleUpload} disabled={uploading || !opId || !files.length}>
+          {uploading ? 'Uploading...' : files.length > 1 ? `Upload ${files.length} Files` : 'Upload & Process'}
         </Button>
       </DialogActions>
     </Dialog>

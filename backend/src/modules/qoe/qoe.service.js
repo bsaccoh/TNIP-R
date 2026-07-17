@@ -85,6 +85,20 @@ export async function submitComplaint({
   return { complaint_ref: ref, complaint_id: result.insertId };
 }
 
+/* ── Public tracking by ref ──────────────────────────────────────────────── */
+export async function trackComplaint(ref) {
+  await ensureTables();
+  const [row] = await query(`
+    SELECT c.complaint_ref, c.issue_type, c.severity, c.status,
+           c.district, c.area_detail, c.description,
+           c.resolution_note, c.created_at, c.updated_at, c.resolved_at,
+           o.operator_name
+      FROM consumer_complaints c
+      LEFT JOIN operators o ON o.operator_id = c.operator_id
+     WHERE c.complaint_ref = :ref`, { ref });
+  return row || null;
+}
+
 /* ── List / filter ───────────────────────────────────────────────────────── */
 export async function listComplaints({
   operatorId, status, issueType, district, severity,

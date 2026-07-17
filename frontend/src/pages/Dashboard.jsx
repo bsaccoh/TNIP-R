@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Grid, Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableHead,
   TableRow, Chip, Stack, Alert, AlertTitle, LinearProgress,
@@ -10,7 +11,14 @@ import PodcastsIcon from '@mui/icons-material/Podcasts';
 import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt';
 import UpdateIcon from '@mui/icons-material/Update';
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
-import RouteIcon from '@mui/icons-material/Route';
+import RouteIcon         from '@mui/icons-material/Route';
+import TimelineIcon      from '@mui/icons-material/Timeline';
+import LocationOffIcon   from '@mui/icons-material/LocationOff';
+import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
+import TrendingUpIcon    from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon  from '@mui/icons-material/TrendingDown';
+import TrendingFlatIcon  from '@mui/icons-material/TrendingFlat';
+import EmojiEventsIcon   from '@mui/icons-material/EmojiEvents';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ClearIcon from '@mui/icons-material/Clear';
 import CheckIcon from '@mui/icons-material/Check';
@@ -581,6 +589,10 @@ export default function Dashboard() {
           return null;
         })()}
 
+        <DtQuickLinks />
+
+        <LatestCampaignCard />
+
         <DriveTestSection filter={dtFilter} tip={tip} opColor={opColor} />
 
         {/* ── Data freshness ── */}
@@ -607,6 +619,99 @@ export default function Dashboard() {
 
       </Grid>
     </Box>
+  );
+}
+
+/* ── Quick-access links to drive test analysis pages ─────────────────────── */
+const DT_LINKS = [
+  { to: '/drive-test-trend',      label: 'Campaign Trend',   icon: <TimelineIcon />,      color: '#1565c0' },
+  { to: '/drive-test-blackspots', label: 'Dead Zones',       icon: <LocationOffIcon />,   color: '#880e4f' },
+  { to: '/drive-test-corridor',   label: 'Route Analysis',   icon: <RouteIcon />,         color: '#2e7d32' },
+  { to: '/drive-test-pci',        label: 'PCI Analysis',     icon: <WifiTetheringIcon />, color: '#6a1b9a' },
+];
+
+function DtQuickLinks() {
+  return (
+    <Grid item xs={12}>
+      <Stack direction="row" spacing={1.5} alignItems="center" mt={0.5} mb={0.5} flexWrap="wrap" gap={1.5}>
+        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+          Quick access:
+        </Typography>
+        {DT_LINKS.map((l) => (
+          <Button key={l.to} component={Link} to={l.to} size="small" variant="outlined"
+            startIcon={l.icon}
+            sx={{
+              borderColor: l.color, color: l.color, textTransform: 'none', fontSize: '0.78rem',
+              '&:hover': { bgcolor: `${l.color}14`, borderColor: l.color },
+            }}>
+            {l.label}
+          </Button>
+        ))}
+      </Stack>
+    </Grid>
+  );
+}
+
+/* ── Latest Campaign card ─────────────────────────────────────────────────── */
+function LatestCampaignCard() {
+  const [campaign, setCampaign] = useState(null);
+
+  useEffect(() => {
+    get('/drive-tests/trend').then((r) => {
+      const campaigns = r.data?.campaigns;
+      if (campaigns?.length) setCampaign(campaigns[campaigns.length - 1]);
+    }).catch(() => {});
+  }, []);
+
+  if (!campaign) return null;
+
+  const trendColor = { improving: '#2e7d32', declining: '#c62828', stable: '#757575' };
+  const TrendIcon = campaign.trend === 'improving' ? TrendingUpIcon
+    : campaign.trend === 'declining' ? TrendingDownIcon : TrendingFlatIcon;
+  const scoreColor = campaign.score >= 70 ? '#2e7d32' : campaign.score >= 50 ? '#e65100' : '#c62828';
+
+  return (
+    <Grid item xs={12} sm={6} md={4}>
+      <Card sx={{ height: '100%', borderLeft: `4px solid ${scoreColor}` }}>
+        <CardContent sx={{ pb: '12px !important' }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Latest Campaign
+              </Typography>
+              <Typography variant="h5" fontWeight={800} sx={{ color: scoreColor, lineHeight: 1.1 }}>
+                {campaign.score != null ? campaign.score.toFixed(1) : '—'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">QoS Score</Typography>
+            </Box>
+            <Stack alignItems="flex-end" spacing={0.3}>
+              <Chip label={campaign.operator} size="small" sx={{ fontSize: '0.7rem' }} />
+              <Typography variant="caption" color="text.secondary">{campaign.timeLabel}</Typography>
+              <Stack direction="row" spacing={0.3} alignItems="center">
+                <TrendIcon sx={{ fontSize: 14, color: trendColor[campaign.trend] || '#757575' }} />
+                <Typography variant="caption" sx={{ color: trendColor[campaign.trend] || '#757575' }}>
+                  {campaign.trend ?? 'stable'}
+                </Typography>
+              </Stack>
+            </Stack>
+          </Stack>
+          <Stack direction="row" spacing={2} mt={1}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">RSRP</Typography>
+              <Typography variant="body2" fontWeight={600}>{campaign.avgRsrp ?? '—'} dBm</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">DL</Typography>
+              <Typography variant="body2" fontWeight={600}>{campaign.avgDl != null ? `${campaign.avgDl.toLocaleString()} kbps` : '—'}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">Samples</Typography>
+              <Typography variant="body2" fontWeight={600}>{campaign.sampleCount?.toLocaleString()}</Typography>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Grid>
   );
 }
 

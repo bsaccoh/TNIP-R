@@ -5,6 +5,12 @@ import { requireRole, operatorScope } from '../../middleware/rbac.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ok, created } from '../../utils/http.js';
 import * as service from './drivetest.service.js';
+import * as report from './report.service.js';
+import * as regional from './regional.service.js';
+import * as trend     from './trend.service.js';
+import * as blackspot from './blackspot.service.js';
+import * as corridor  from './corridor.service.js';
+import * as pci       from './pci.service.js';
 
 const router = Router();
 router.use(authenticate);
@@ -13,9 +19,30 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
 router.get('/', operatorScope, asyncHandler(async (req, res) =>
   ok(res, await service.listDriveTests(req.scope?.operatorId ?? null))));
 
+router.post('/preview', requireRole('REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'SYSTEM_ADMIN'),
+  upload.array('file', 50), asyncHandler(async (req, res) => {
+    const files = req.files || [];
+    if (!files.length) throw new Error('No files provided');
+    const { previewTrpFile } = await import('./trp-parser.js');
+    const results = [];
+    for (const f of files) {
+      try {
+        if (f.originalname.toLowerCase().endsWith('.trp')) {
+          results.push({ filename: f.originalname, ...await previewTrpFile(f.buffer) });
+        } else {
+          results.push({ filename: f.originalname, operator: null, device: null, technology: '4G', testDate: null, testName: f.originalname.replace(/\.[^.]+$/, '') });
+        }
+      } catch {
+        results.push({ filename: f.originalname, error: 'Could not read file metadata' });
+      }
+    }
+    ok(res, results);
+  }));
+
 router.post('/import', requireRole('REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'SYSTEM_ADMIN'),
-  upload.single('file'), asyncHandler(async (req, res) => {
-    if (!req.file) throw new Error('No file uploaded (field name: file)');
+  upload.array('file', 50), asyncHandler(async (req, res) => {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files.length) throw new Error('No file uploaded (field name: file)');
     const operatorId = Number(req.body.operator_id);
     if (!operatorId) throw new Error('operator_id is required');
     const meta = {
@@ -27,8 +54,35 @@ router.post('/import', requireRole('REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'SYST
       testerName: req.body.tester_name,
       notes: req.body.notes,
     };
-    const result = await service.importDriveTest(operatorId, meta, req.file.buffer, req.file.originalname);
-    return created(res, result);
+
+    if (files.length === 1) {
+      const f = files[0];
+      const isTrp = f.originalname.toLowerCase().endsWith('.trp');
+      const result = isTrp
+        ? await service.importTrpFile(operatorId, meta, f.buffer, f.originalname)
+        : await service.importDriveTest(operatorId, meta, f.buffer, f.originalname);
+      return created(res, result);
+    }
+
+    const results = [];
+    for (const f of files) {
+      try {
+        const isTrp = f.originalname.toLowerCase().endsWith('.trp');
+        const result = isTrp
+          ? await service.importTrpFile(operatorId, { ...meta, testName: '' }, f.buffer, f.originalname)
+          : await service.importDriveTest(operatorId, { ...meta, testName: '' }, f.buffer, f.originalname);
+        results.push({ filename: f.originalname, status: 'success', ...result });
+      } catch (err) {
+        results.push({ filename: f.originalname, status: 'error', message: err.message });
+      }
+    }
+    return created(res, {
+      batch: true,
+      total: files.length,
+      succeeded: results.filter((r) => r.status === 'success').length,
+      failed: results.filter((r) => r.status === 'error').length,
+      results,
+    });
   }));
 
 // ─── Live recording routes (mobile app) ─────────────────────────────────────
@@ -67,6 +121,61 @@ router.get('/compare', asyncHandler(async (req, res) => {
   ok(res, await service.compareDriveTests(ids));
 }));
 
+// ─── Trend / Campaign analysis ─────────────────────────────────────────────
+router.get('/trend', asyncHandler(async (req, res) =>
+  ok(res, await trend.getCampaignTrend(req.query.operatorId ? Number(req.query.operatorId) : null))));
+
+// ─── Dead zone / blackspot mapping ─────────────────────────────────────────
+router.get('/blackspots', asyncHandler(async (req, res) =>
+  ok(res, await blackspot.getBlackspots(
+    req.query.threshold ? Number(req.query.threshold) : -110,
+    req.query.operatorId ? Number(req.query.operatorId) : null,
+  ))));
+
+// ─── Corridor / route analysis ──────────────────────────────────────────────
+router.get('/corridor/tests', asyncHandler(async (req, res) =>
+  ok(res, await corridor.listTestsForCorridor())));
+
+router.get('/corridor/:driveTestId', asyncHandler(async (req, res) =>
+  ok(res, await corridor.getCorridorAnalysis(
+    Number(req.params.driveTestId),
+    req.query.segments ? Number(req.query.segments) : 20,
+  ))));
+
+// ─── PCI / interference analysis ────────────────────────────────────────────
+router.get('/pci-analysis', asyncHandler(async (req, res) =>
+  ok(res, await pci.getPciAnalysis(
+    req.query.operatorId ? Number(req.query.operatorId) : null,
+  ))));
+
+// ─── Regional analysis routes ───────────────────────────────────────────────
+router.get('/regional/overview', asyncHandler(async (req, res) =>
+  ok(res, await regional.getRegionalOverview())));
+
+router.get('/regional/comparison', asyncHandler(async (req, res) =>
+  ok(res, await regional.getRegionalComparison())));
+
+router.get('/regional/districts', asyncHandler(async (req, res) =>
+  ok(res, await regional.getDistrictData())));
+
+router.get('/regional/:regionId', asyncHandler(async (req, res) =>
+  ok(res, await regional.getRegionalDetail(req.params.regionId))));
+
+// ─── Report generation routes ──────────────────────────────────────────────
+router.get('/report/pdf', asyncHandler(async (req, res) => {
+  const regionId = req.query.regionId || null;
+  const buf = await report.generatePdfReport(regionId);
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="DT_Report_${regionId || 'National'}_${new Date().toISOString().slice(0,10)}.pdf"` });
+  res.send(buf);
+}));
+
+router.get('/report/excel', asyncHandler(async (req, res) => {
+  const regionId = req.query.regionId || null;
+  const buf = await report.generateExcelReport(regionId);
+  res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="DT_Report_${regionId || 'National'}_${new Date().toISOString().slice(0,10)}.xlsx"` });
+  res.send(Buffer.from(buf));
+}));
+
 router.get('/:id/samples', asyncHandler(async (req, res) =>
   ok(res, await service.getDriveTestSamples(req.params.id))));
 
@@ -90,6 +199,12 @@ router.get('/:id/compliance', asyncHandler(async (req, res) => {
   if (req.query.dl) t.dl = Number(req.query.dl);
   ok(res, await service.getComplianceSummary(req.params.id, t));
 }));
+
+router.get('/operator-summary/:operatorId', asyncHandler(async (req, res) =>
+  ok(res, await service.getOperatorExecutiveSummary(req.params.operatorId))));
+
+router.get('/compare-operators/all', asyncHandler(async (req, res) =>
+  ok(res, await service.getOperatorComparisonDashboard())));
 
 router.delete('/:id', requireRole('REGULATOR_ADMIN', 'SYSTEM_ADMIN'), asyncHandler(async (req, res) => {
   await service.deleteDriveTest(req.params.id);

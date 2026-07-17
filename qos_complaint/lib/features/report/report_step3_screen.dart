@@ -38,7 +38,13 @@ class ReportStep3Screen extends ConsumerWidget {
                 children: [
                   // 1. Issue Details Card
                   _buildDetailsCard(draft),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // 1b. Financial Details Card (Billing / Mobile Money only)
+                  if (draft.isBillingType) ...[
+                    _buildFinancialDetailsCard(draft),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 2. Attachments Card
                   if (draft.attachments.isNotEmpty) ...[
@@ -99,6 +105,50 @@ class ReportStep3Screen extends ConsumerWidget {
           const Divider(height: 20, color: AppColors.border),
 
           _detailRow("Description", draft.description.isNotEmpty ? draft.description : "No description provided."),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialDetailsCard(DraftReport draft) {
+    final isMM = draft.issueType == 'Mobile Money';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.dynamicCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isMM ? AppColors.primaryBlue.withOpacity(0.3) : AppColors.warningOrange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isMM ? Icons.account_balance_wallet_rounded : Icons.receipt_long_rounded,
+                color: isMM ? AppColors.primaryBlue : AppColors.warningOrange,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text("Financial Details", style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (draft.billingSubCategory != null) ...[
+            _detailRow("Category", draft.billingSubCategory!),
+            const Divider(height: 20, color: AppColors.border),
+          ],
+          if (draft.transactionRef != null && draft.transactionRef!.isNotEmpty) ...[
+            _detailRow("Transaction Ref", draft.transactionRef!),
+            const Divider(height: 20, color: AppColors.border),
+          ],
+          if (draft.disputedAmount != null) ...[
+            _detailRow("Amount Disputed", "SLE ${draft.disputedAmount!.toStringAsFixed(0)}"),
+            const Divider(height: 20, color: AppColors.border),
+          ],
+          if (draft.transactionDate != null)
+            _detailRow("Transaction Date", draft.transactionDate!),
         ],
       ),
     );
@@ -168,6 +218,8 @@ class ReportStep3Screen extends ConsumerWidget {
             // Submit complaint to database/API
             await ref.read(complaintsProvider.notifier).submitNewComplaint(draft);
             
+            if (!context.mounted) return;
+
             // Clear current draft state
             ref.read(draftReportProvider.notifier).reset();
 

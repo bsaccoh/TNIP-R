@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import '../../app/theme/app_theme.dart';
-
+import '../../core/models/app_models.dart';
+import '../../app/providers/state_providers.dart';
 class SpeedTestScreen extends ConsumerStatefulWidget {
   const SpeedTestScreen({super.key});
 
@@ -119,6 +121,7 @@ class _SpeedTestScreenState extends ConsumerState<SpeedTestScreen> with SingleTi
       setState(() {
         _testingStage = 'done';
       });
+      _saveResult();
     } catch (_) {
       // Offline / Timeout simulation fallback
       _runSimulatedTest();
@@ -170,6 +173,22 @@ class _SpeedTestScreenState extends ConsumerState<SpeedTestScreen> with SingleTi
     setState(() {
       _testingStage = 'done';
     });
+    _saveResult();
+  }
+
+  void _saveResult() {
+    final now = DateTime.now();
+    final dateStr = "${now.day} Jul ${now.year}, ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}";
+    final result = SpeedTestResult(
+      id: "ST${now.millisecondsSinceEpoch}",
+      timestamp: dateStr,
+      downloadSpeed: _downloadSpeed,
+      uploadSpeed: _uploadSpeed,
+      ping: _ping,
+      networkType: "WiFi/4G",
+      operatorName: _carrierName,
+    );
+    ref.read(speedTestHistoryProvider.notifier).addResult(result);
   }
 
   @override
@@ -306,6 +325,89 @@ class _SpeedTestScreenState extends ConsumerState<SpeedTestScreen> with SingleTi
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
                     elevation: 4,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Compare Operators by Region CTA
+              GestureDetector(
+                onTap: () => context.push('/speed-comparison'),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.dynamicCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBlue.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.compare_arrows_rounded, color: AppColors.primaryBlue, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Compare Operators by Region",
+                                style: AppTextStyles.small.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            const SizedBox(height: 2),
+                            Text("See which operator is fastest in your district",
+                                style: AppTextStyles.micro.copyWith(color: AppColors.textMuted)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: AppColors.primaryBlue, size: 22),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // View Test History CTA
+              GestureDetector(
+                onTap: () => context.push('/speed-history'),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.dynamicCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.accentGreen.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.accentGreen.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.history_rounded, color: AppColors.accentGreen, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Speed Test History",
+                                style: AppTextStyles.small.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            const SizedBox(height: 2),
+                            Text("View past results and performance trends",
+                                style: AppTextStyles.micro.copyWith(color: AppColors.textMuted)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: AppColors.accentGreen, size: 22),
+                    ],
                   ),
                 ),
               ),

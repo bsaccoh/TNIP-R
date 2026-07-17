@@ -2,6 +2,7 @@ import { schedule } from 'node-cron';
 import nodemailer from 'nodemailer';
 import { query } from '../config/db.js';
 import * as reportsService from '../modules/reports/reports.service.js';
+import { getCampaignTrend } from '../modules/drivetest/trend.service.js';
 import { markRan, recordRunLog } from '../modules/reports/schedules.service.js';
 import { logger } from '../config/logger.js';
 import { env } from '../config/env.js';
@@ -25,14 +26,34 @@ export async function executeSchedule(s, triggeredBy = 'AUTO') {
   try {
     const opId = s.operator_id || null;
     let rows;
+    let sheetName = s.report_type.toUpperCase();
     switch (s.report_type) {
-      case 'compliance': rows = await reportsService.generateComplianceReport(opId, null, null); break;
-      case 'trend':      rows = await reportsService.generateTrendReport(opId, null, null);      break;
-      case 'anomaly':    rows = await reportsService.generateAnomalyReport(opId);                break;
-      default:           rows = await reportsService.generateOperatorKpiReport(opId, null, null);
+      case 'compliance':  rows = await reportsService.generateComplianceReport(opId, null, null); break;
+      case 'trend':       rows = await reportsService.generateTrendReport(opId, null, null);      break;
+      case 'anomaly':     rows = await reportsService.generateAnomalyReport(opId);                break;
+      case 'drive_test': {
+        const dtData = await getCampaignTrend(opId);
+        rows = dtData.campaigns.map((c) => ({
+          campaign_index:   c.campaignIndex,
+          time_label:       c.timeLabel,
+          test_date:        c.testDate,
+          operator:         c.operator,
+          qos_score:        c.score,
+          avg_rsrp_dbm:     c.avgRsrp,
+          avg_sinr_db:      c.avgSinr,
+          avg_dl_kbps:      c.avgDl,
+          avg_ul_kbps:      c.avgUl,
+          coverage_pct:     c.coveragePct,
+          sample_count:     c.sampleCount,
+          distance_km:      c.distanceKm,
+        }));
+        sheetName = 'DRIVE_TEST_CAMPAIGNS';
+        break;
+      }
+      default:            rows = await reportsService.generateOperatorKpiReport(opId, null, null);
     }
 
-    const buffer = reportsService.buildExcelBuffer(rows, s.report_type.toUpperCase());
+    const buffer = reportsService.buildExcelBuffer(rows, sheetName);
     const filename = `TNIP_${s.report_type}_${new Date().toISOString().slice(0,10)}.xlsx`;
 
     let emailed = false;

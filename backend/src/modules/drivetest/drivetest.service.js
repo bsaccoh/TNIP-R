@@ -3,6 +3,9 @@ import { ApiError } from '../../utils/ApiError.js';
 import * as xlsx from 'xlsx';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import { parseTrpFile } from './trp-parser.js';
+export { getOperatorExecutiveSummary, getOperatorComparisonDashboard } from './executive.service.js';
 
 const RSRP_COL_NAMES = ['rsrp', 'rsrp_dbm', 'rsrp (dbm)', 'lte rsrp', 'serving rsrp'];
 const RSRQ_COL_NAMES = ['rsrq', 'rsrq_db', 'rsrq (db)', 'lte rsrq'];
@@ -21,6 +24,22 @@ function findCol(headers, candidates) {
   return null;
 }
 
+function fileHash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+async function checkDuplicate(hash) {
+  const [existing] = await query(
+    `SELECT drive_test_id, test_name, test_date FROM drive_tests WHERE file_hash = :hash`,
+    { hash },
+  );
+  if (existing) {
+    throw ApiError.badRequest(
+      `This file has already been imported as "${existing.test_name}" (ID: ${existing.drive_test_id}, Date: ${existing.test_date}). Skipping duplicate.`,
+    );
+  }
+}
+
 export async function ensureTables() {
   await query(`CREATE TABLE IF NOT EXISTS drive_tests (
     drive_test_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -29,14 +48,13 @@ export async function ensureTables() {
     technology VARCHAR(10), device_model VARCHAR(100), tester_name VARCHAR(100),
     notes TEXT, status VARCHAR(20) DEFAULT 'UPLOADED',
     total_samples INT DEFAULT 0, distance_km DECIMAL(8,2), duration_min INT,
+    overall_score DECIMAL(5,2), ai_summary TEXT,
     file_path VARCHAR(512) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
-  try {
-    await query(`ALTER TABLE drive_tests ADD COLUMN file_path VARCHAR(512) NULL`);
-  } catch (err) {
-    // Column already exists
-  }
+  try { await query(`ALTER TABLE drive_tests ADD COLUMN file_path VARCHAR(512) NULL`); } catch {}
+  try { await query(`ALTER TABLE drive_tests ADD COLUMN file_hash VARCHAR(64) NULL, ADD UNIQUE INDEX idx_file_hash (file_hash)`); } catch {}
+  try { await query(`ALTER TABLE drive_tests ADD COLUMN overall_score DECIMAL(5,2) NULL, ADD COLUMN ai_summary TEXT NULL`); } catch {}
   await query(`CREATE TABLE IF NOT EXISTS drive_test_samples (
     sample_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     drive_test_id INT NOT NULL, ts DATETIME,
@@ -51,6 +69,9 @@ export async function ensureTables() {
 
 export async function importDriveTest(operatorId, meta, buffer, filename) {
   await ensureTables();
+
+  const hash = fileHash(buffer);
+  await checkDuplicate(hash);
 
   const wb = xlsx.read(buffer, { type: 'buffer', cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -79,8 +100,8 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
 
   return withTransaction(async ({ q }) => {
     const ins = await q(
-      `INSERT INTO drive_tests (operator_id, test_name, test_date, route_type, technology, device_model, tester_name, notes, file_path)
-       VALUES (:opId, :name, :date, :route, :tech, :device, :tester, :notes, :filePath)`,
+      `INSERT INTO drive_tests (operator_id, test_name, test_date, route_type, technology, device_model, tester_name, notes, file_path, file_hash)
+       VALUES (:opId, :name, :date, :route, :tech, :device, :tester, :notes, :filePath, :hash)`,
       {
         opId: operatorId,
         name: meta.testName || filename,
@@ -91,6 +112,7 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
         tester: meta.testerName || null,
         notes: meta.notes || null,
         filePath: dbFilePath,
+        hash,
       }
     );
     const driveTestId = ins.insertId;
@@ -133,10 +155,22 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
     }
 
     const distKm = validSamples > 1 ? estimateDistance(rows, latCol, lonCol) : 0;
+    
+    // Calculate new KPIs
+    const { calculateOverallScore, generateAiSummary } = await import('./scoring.service.js');
+    const samplesForScoring = rows.map(r => ({
+      rsrp: rsrpCol ? parseFloat(r[rsrpCol]) : null,
+      sinr: sinrCol ? parseFloat(r[sinrCol]) : null,
+    }));
+    const score = await calculateOverallScore(samplesForScoring);
+    
+    // Get operator name for AI summary
+    const [opRes] = await q('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
+    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, distKm.toFixed(2), validSamples);
 
     await q(
-      `UPDATE drive_tests SET total_samples = :s, distance_km = :d, status = 'COMPLETED' WHERE drive_test_id = :id`,
-      { s: validSamples, d: distKm.toFixed(2), id: driveTestId }
+      `UPDATE drive_tests SET total_samples = :s, distance_km = :d, overall_score = :score, ai_summary = :aiSummary, status = 'COMPLETED' WHERE drive_test_id = :id`,
+      { s: validSamples, d: distKm.toFixed(2), score, aiSummary, id: driveTestId }
     );
 
     return {
@@ -145,6 +179,91 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
       samplesSkipped: rows.length - validSamples,
       distanceKm: distKm.toFixed(2),
       columnsFound: { rsrp: !!rsrpCol, rsrq: !!rsrqCol, sinr: !!sinrCol, dl: !!dlCol, ul: !!ulCol },
+    };
+  });
+}
+
+export async function importTrpFile(operatorId, meta, buffer, filename) {
+  await ensureTables();
+
+  const hash = fileHash(buffer);
+  await checkDuplicate(hash);
+
+  const parsed = await parseTrpFile(buffer);
+  if (!parsed.samples.length) throw ApiError.badRequest('TRP file contains no GPS-correlated samples');
+
+  const uploadsDir = path.resolve('./uploads/drivetests');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const storedFilename = `${Date.now()}-${filename}`;
+  const localFilePath = path.join(uploadsDir, storedFilename);
+  fs.writeFileSync(localFilePath, buffer);
+
+  return withTransaction(async ({ q }) => {
+    const technology = meta.technology || '4G';
+    const deviceModel = meta.deviceModel || parsed.meta.device || null;
+    const testDate = meta.testDate
+      || (parsed.summary.startTime ? parsed.summary.startTime.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+
+    const { calculateOverallScore, generateAiSummary, computeDetailedStats } = await import('./scoring.service.js');
+    const score = await calculateOverallScore(parsed.samples);
+    const stats = computeDetailedStats(parsed.samples);
+    const [opRes] = await q('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
+    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, parsed.summary.distanceKm.toFixed(2), parsed.samples.length, stats);
+
+    const ins = await q(
+      `INSERT INTO drive_tests (operator_id, test_name, test_date, route_type, technology,
+        device_model, tester_name, notes, file_path, file_hash, total_samples, distance_km, duration_min, overall_score, ai_summary, status)
+       VALUES (:opId, :name, :date, :route, :tech, :device, :tester, :notes, :filePath, :hash,
+               :samples, :dist, :dur, :score, :aiSummary, 'COMPLETED')`,
+      {
+        opId: operatorId,
+        name: meta.testName || filename.replace(/\.[^.]+$/, ''),
+        date: testDate,
+        route: meta.routeType || 'urban',
+        tech: technology,
+        device: deviceModel,
+        tester: meta.testerName || null,
+        notes: meta.notes || `Parsed from TEMS Pocket TRP. Operator: ${parsed.meta.operator || 'N/A'}. App: ${parsed.meta.appVersion || 'N/A'}`,
+        filePath: `uploads/drivetests/${storedFilename}`,
+        hash,
+        samples: parsed.samples.length,
+        dist: parsed.summary.distanceKm.toFixed(2),
+        dur: parsed.summary.durationMin,
+        score,
+        aiSummary
+      },
+    );
+    const driveTestId = ins.insertId;
+
+    for (let i = 0; i < parsed.samples.length; i += 500) {
+      const chunk = parsed.samples.slice(i, i + 500);
+      const values = chunk.map((s) => [
+        driveTestId,
+        s.ts ? s.ts.toISOString().slice(0, 19).replace('T', ' ') : null,
+        s.latitude, s.longitude,
+        s.rsrp, s.rsrq, s.sinr, null,
+        s.dl_throughput, s.ul_throughput,
+        s.pci, s.earfcn, s.band, null, null, null,
+      ]);
+      await q(
+        `INSERT INTO drive_test_samples
+         (drive_test_id, ts, latitude, longitude, rsrp, rsrq, sinr, rssi,
+          dl_throughput, ul_throughput, pci, earfcn, band, event_type, call_status, serving_cell)
+         VALUES ${values.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',')}`,
+        values.flat(),
+      );
+    }
+
+    return {
+      driveTestId,
+      format: 'TRP',
+      samplesImported: parsed.samples.length,
+      distanceKm: parsed.summary.distanceKm,
+      durationMin: parsed.summary.durationMin,
+      device: parsed.meta.device,
+      operator: parsed.meta.operator,
+      startTime: parsed.summary.startTime,
+      endTime: parsed.summary.endTime,
     };
   });
 }
@@ -569,7 +688,6 @@ export async function getConfig() {
     catch { config[r.config_key] = r.config_value; }
   }
 
-  // Return defaults if not set
   return {
     rsrp_threshold: config.rsrp_threshold ?? -100,
     rsrq_threshold: config.rsrq_threshold ?? -15,
@@ -580,11 +698,23 @@ export async function getConfig() {
     gap_min_samples: config.gap_min_samples ?? 3,
     segment_size: config.segment_size ?? 25,
     nearby_radius_km: config.nearby_radius_km ?? 2,
+    rsrp_excellent: config.rsrp_excellent ?? -80,
+    rsrp_good: config.rsrp_good ?? -90,
+    rsrp_fair: config.rsrp_fair ?? -100,
+    rsrp_poor: config.rsrp_poor ?? -110,
+    sinr_excellent: config.sinr_excellent ?? 20,
+    sinr_good: config.sinr_good ?? 10,
+    sinr_fair: config.sinr_fair ?? 0,
+    score_weight_rsrp: config.score_weight_rsrp ?? 0.35,
+    score_weight_sinr: config.score_weight_sinr ?? 0.25,
+    score_weight_dl: config.score_weight_dl ?? 0.25,
+    score_weight_rsrq: config.score_weight_rsrq ?? 0.15,
     ...config,
   };
 }
 
 export async function updateConfig(updates) {
+  const { clearConfigCache } = await import('./scoring.service.js');
   await query(`CREATE TABLE IF NOT EXISTS drive_test_config (
     config_key VARCHAR(50) PRIMARY KEY,
     config_value TEXT NOT NULL,
@@ -600,6 +730,7 @@ export async function updateConfig(updates) {
       { key, val: JSON.stringify(value) }
     );
   }
+  clearConfigCache();
   return getConfig();
 }
 

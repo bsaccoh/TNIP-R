@@ -516,6 +516,7 @@ export default function PmKpiDashboard() {
                     sx={{
                       minWidth: 120,
                       fontWeight: 700,
+                      color: OP_COLORS[op],
                       borderLeft: `2.5px solid ${OP_COLORS[op]}`,
                     }}
                   >

@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS drive_tests (
   total_samples  INT DEFAULT 0,
   distance_km    DECIMAL(8,2),
   duration_min   INT,
+  overall_score  DECIMAL(5,2),
+  ai_summary     TEXT,
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (operator_id) REFERENCES operators(operator_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -37,3 +37,14 @@ Thumbs.db
 .vscode/
 .idea/
 **/.claude/
+
+# Drive Test & Data
+backend/uploads/
+drive_test_logs/
+*.xlsx
+*.apk
+*.aab
+*.ipa
+
+# External dependencies
+qos_complaint/jdk17/

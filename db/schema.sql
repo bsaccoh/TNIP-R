@@ -642,4 +642,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   FOREIGN KEY (user_id) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
+
+
 SET FOREIGN_KEY_CHECKS = 1;
