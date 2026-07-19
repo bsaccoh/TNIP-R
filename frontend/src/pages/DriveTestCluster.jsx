@@ -729,7 +729,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         getSampleColor(s[cfg.secondary.key], cfg.secondary),
       ]) : [];
       const problemMarkers = problemAreas.map((a) => [
-        a.lat, a.lon, a.color, `${a.locationName} (${a.avgVal} ${cfg.primary.unit || ''})`, 8
+        a.lat, a.lon, a.color, null, 8
       ]);
       mapData[safeKey] = { primary: primThin, secondary: secThin, problems: problemMarkers };
 
