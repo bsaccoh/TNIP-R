@@ -714,7 +714,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         deadZoneMarkers.push([
           dz.lat, dz.lon,
           dzSeverityColor(dz.samples),
-          `${opName} ${tech}: ${dz.avgVal} ${cfg.primary.unit || ''} (${dz.samples} samples)`,
+          null,
           dzRadius(dz.samples),
         ]);
       });
@@ -728,10 +728,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         Number(s.latitude).toFixed(6), Number(s.longitude).toFixed(6),
         getSampleColor(s[cfg.secondary.key], cfg.secondary),
       ]) : [];
-      const problemMarkers = problemAreas.map((a) => [
-        a.lat, a.lon, a.color, null, 8
-      ]);
-      mapData[safeKey] = { primary: primThin, secondary: secThin, problems: problemMarkers };
+      mapData[safeKey] = { primary: primThin, secondary: secThin };
 
       const distTable = (rows, label, unit, passLabel, passPct, passCount_) => `
         <div style="flex:1;min-width:0;">
@@ -765,8 +762,36 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
 
       const problemTable = problemAreas.length ? `
         <div style="margin-top:10px;page-break-inside:avoid;">
-          <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#c0392b;">Top Problem Areas Map — ${cfg.primary.label}</div>
-          <div id="map_${safeKey}_prob" style="height:200px;border:1px solid #ccc;border-radius:3px;"></div>
+          <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#c0392b;">Top Problem Areas — ${cfg.primary.label}</div>
+          <table style="border-collapse:collapse;width:100%;font-size:10px;">
+            <thead>
+              <tr style="background:#c0392b;color:#fff;">
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:left;width:30px;">#</th>
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:left;">Location Name</th>
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:left;">Latitude</th>
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:left;">Longitude</th>
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:right;">Avg ${cfg.primary.label}</th>
+                <th style="padding:4px 6px;border:1px solid #ddd;text-align:right;width:70px;">Samples</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${problemAreas.map((a, i) => {
+                const loc = a.locationName && a.locationName.trim() !== '' && a.locationName !== '—' && a.locationName !== 'Unknown'
+                  ? a.locationName
+                  : '—';
+                return `<tr style="background:${i % 2 === 0 ? '#fff5f5' : '#fff'}">
+                  <td style="padding:4px 6px;border:1px solid #ddd;">${i + 1}</td>
+                  <td style="padding:4px 6px;border:1px solid #ddd;">${loc}</td>
+                  <td style="padding:4px 6px;border:1px solid #ddd;">${Number(a.lat).toFixed(6)}</td>
+                  <td style="padding:4px 6px;border:1px solid #ddd;">${Number(a.lon).toFixed(6)}</td>
+                  <td style="padding:4px 6px;border:1px solid #ddd;text-align:right;color:#c0392b;font-weight:bold;">
+                    ${a.avgVal} ${cfg.primary.unit || ''}
+                  </td>
+                  <td style="padding:4px 6px;border:1px solid #ddd;text-align:right;">${a.samples}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
         </div>` : '';
 
       const remarks = buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, deadZones.length, problemAreas);
@@ -985,9 +1010,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         if (__mapData[key].secondary && __mapData[key].secondary.length) {
           initMap('map_' + key + '_s', __mapData[key].secondary, 3, false);
         }
-        if (__mapData[key].problems && __mapData[key].problems.length) {
-          initMap('map_' + key + '_prob', __mapData[key].problems, 8, true);
-        }
+
       });
       if (__dzMarkers && __dzMarkers.length) {
         initMap('map_deadzones', __dzMarkers, 8, true);
