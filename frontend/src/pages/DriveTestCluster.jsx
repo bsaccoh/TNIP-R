@@ -307,6 +307,121 @@ export function getRemarksAnalysis(primaryMetricKey, isOrange, primaryPct) {
   return { condition, cause, recommendation };
 }
 
+// ── Executive Summary builder for reports ────────────────────────────────────
+export function buildExecutiveSummary(records, geoInfo) {
+  if (!records || !records.length) return '';
+
+  const totalCombinations = records.length;
+  const metTarget = records.filter(r => r.primaryPct >= 80).length;
+
+  const sortedByPerf = [...records].sort((a, b) => b.primaryPct - a.primaryPct);
+  const topPerformer = sortedByPerf[0];
+
+  const totalDeadZones = records.reduce((sum, r) => sum + r.deadZonesCount, 0);
+
+  let recommends = [];
+  const lowStrength = records.some(r => r.primaryPct < 80 && !/sinr|ecno|ec\/no/i.test(r.primaryLabel));
+  const lowQuality = records.some(r => r.primaryPct < 80 && /sinr|ecno|ec\/no/i.test(r.primaryLabel));
+
+  if (lowStrength) {
+    recommends.push("<strong>Site Densification & Propagation Optimization:</strong> Deploy infill micro-sites or local repeaters in coordinates identified as dead zones. Adjust mechanical/electrical down-tilts on serving antennas to focus signal power onto coverage gaps.");
+  }
+  if (lowQuality) {
+    recommends.push("<strong>Pilot Pollution & Frequency Audits:</strong> Adjust azimuths/tilts of overlapping cells and conduct a frequency plan review to resolve dynamic inter-cell interference (pilot pollution).");
+  }
+  if (totalDeadZones > 0) {
+    recommends.push(`<strong>Dead Zone Mitigation:</strong> Prioritize structural site audits for the ${totalDeadZones} identified dead zone spots where signal strength falls below absolute minimum levels.`);
+  }
+  if (recommends.length === 0) {
+    recommends.push("<strong>Routine Maintenance:</strong> Maintain current power levels, perform routine antenna check-ups, and monitor cell traffic to accommodate future capacity requirements.");
+  }
+
+  const tableRows = records.map((r) => {
+    let statusLabel, statusColor;
+    if (r.primaryPct >= 80) {
+      statusLabel = 'Satisfactory'; statusColor = '#1a7a40';
+    } else if (r.primaryPct >= 60) {
+      statusLabel = 'Below Target'; statusColor = '#b36c00';
+    } else {
+      statusLabel = 'Critical'; statusColor = '#c0392b';
+    }
+
+    const secCol = r.secondaryPct !== null ? `${r.secondaryPct.toFixed(1)}%` : '—';
+    return `
+      <tr>
+        <td style="padding:6px;border:1px solid #ddd;font-weight:bold;">${r.operator}</td>
+        <td style="padding:6px;border:1px solid #ddd;text-align:center;">${r.tech}</td>
+        <td style="padding:6px;border:1px solid #ddd;text-align:right;">${r.primaryPct.toFixed(1)}%</td>
+        <td style="padding:6px;border:1px solid #ddd;text-align:right;">${secCol}</td>
+        <td style="padding:6px;border:1px solid #ddd;text-align:center;color:${r.deadZonesCount > 0 ? '#c0392b' : '#333'};font-weight:${r.deadZonesCount > 0 ? 'bold' : 'normal'};">${r.deadZonesCount}</td>
+        <td style="padding:6px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${statusColor};">${statusLabel}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div style="page-break-before:always;margin-top:24px;border-top:2px solid #0d3c7a;padding-top:16px;">
+      <h2 style="font-size:14px;color:#fff;background:#0d3c7a;padding:8px 12px;margin:0 0 12px 0;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px;">
+        Executive Key Points Summary — ${geoInfo.city || 'Cluster'}
+      </h2>
+      <div style="font-size:10px;line-height:1.6;color:#333;margin-bottom:14px;">
+        This section provides an aggregated performance breakdown across all technologies and operators analyzed in the <strong>${geoInfo.city || 'cluster'}</strong> area.
+      </div>
+      
+      <!-- Key KPI Stats Cards -->
+      <div style="display:flex;gap:12px;margin-bottom:14px;">
+        <div style="flex:1;background:#f0f8ff;border:1px solid #b0d4de;border-radius:4px;padding:8px 12px;">
+          <div style="font-size:8px;text-transform:uppercase;color:#555;font-weight:bold;margin-bottom:2px;">Overall Compliance</div>
+          <div style="font-size:14px;font-weight:bold;color:#0d3c7a;">
+            ${metTarget} / ${totalCombinations}
+          </div>
+          <div style="font-size:8px;color:#666;margin-top:2px;">Operator sectors met target threshold (≥80%)</div>
+        </div>
+        <div style="flex:1;background:#fcf8e3;border:1px solid #faebcc;border-radius:4px;padding:8px 12px;">
+          <div style="font-size:8px;text-transform:uppercase;color:#555;font-weight:bold;margin-bottom:2px;">Gaps Identified</div>
+          <div style="font-size:14px;font-weight:bold;color:#b36c00;">
+            ${totalDeadZones} Dead Zone${totalDeadZones !== 1 ? 's' : ''}
+          </div>
+          <div style="font-size:8px;color:#666;margin-top:2px;">Severe coverage drop spots mapped</div>
+        </div>
+        <div style="flex:1;background:#fdf2f2;border:1px solid #f8d7da;border-radius:4px;padding:8px 12px;">
+          <div style="font-size:8px;text-transform:uppercase;color:#555;font-weight:bold;margin-bottom:2px;">Highest performer</div>
+          <div style="font-size:11px;font-weight:bold;color:#1a7a40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${topPerformer ? `${topPerformer.operator} (${topPerformer.tech})` : '—'}
+          </div>
+          <div style="font-size:8px;color:#666;margin-top:2px;">${topPerformer ? `${topPerformer.primaryPct.toFixed(1)}%` : '—'} pass rate</div>
+        </div>
+      </div>
+
+      <!-- Comparison Matrix -->
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:bold;font-size:11px;margin-bottom:5px;color:#0d3c7a;">Comparative Performance Matrix</div>
+        <table style="border-collapse:collapse;width:100%;font-size:9px;text-align:left;">
+          <thead>
+            <tr style="background:#0d3c7a;color:#fff;">
+              <th style="padding:6px;border:1px solid #ddd;">Operator</th>
+              <th style="padding:6px;border:1px solid #ddd;text-align:center;width:60px;">Technology</th>
+              <th style="padding:6px;border:1px solid #ddd;text-align:right;width:90px;">Primary Pass Rate</th>
+              <th style="padding:6px;border:1px solid #ddd;text-align:right;width:100px;">Secondary Pass Rate</th>
+              <th style="padding:6px;border:1px solid #ddd;text-align:center;width:80px;">Dead Zones</th>
+              <th style="padding:6px;border:1px solid #ddd;text-align:center;width:80px;">Compliance Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Consolidated Action Plan -->
+      <div style="background:#f9f9f9;border-left:4px solid #0d3c7a;padding:10px 12px;border-radius:0 3px 3px 0;">
+        <div style="font-weight:bold;font-size:11px;color:#0d3c7a;margin-bottom:6px;">Consolidated Network Action Recommendations</div>
+        <ul style="margin:0;padding-left:16px;font-size:9px;line-height:1.6;color:#333;">
+          ${recommends.map(r => `<li style="margin-bottom:4px;">${r}</li>`).join('')}
+        </ul>
+      </div>
+    </div>`;
+}
+
 // ── Auto remarks ─────────────────────────────────────────────────────────────
 function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites = [], operators = [] }) {
   const cfg = techCfg;
@@ -669,6 +784,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
   }
 
   const mapData = {};
+  const summaryRecords = [];
   // Dead zone markers: [lat, lon, color, tooltip, radius]
   const deadZoneMarkers = [];
   let allDeadZones = [];
@@ -717,6 +833,19 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
           null,
           dzRadius(dz.samples),
         ]);
+      });
+
+      summaryRecords.push({
+        tech,
+        operator: opName,
+        primaryLabel: cfg.primary.label,
+        primaryPct: pTotal ? (pPass / pTotal) * 100 : 0,
+        primaryPass: pPass,
+        primaryTotal: pTotal,
+        secondaryLabel: cfg.secondary?.label || null,
+        secondaryPct: secPass?.total ? (secPass.pass / secPass.total) * 100 : null,
+        deadZonesCount: deadZones.length,
+        problemAreasCount: problemAreas.length
       });
 
       const safeKey = `${tech}_${opName.replace(/\s/g, '_')}`;
@@ -919,7 +1048,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         No dead zones were identified in this cluster. All measured locations maintain signal above the worst-tier thresholds across all technologies and operators.
       </p>
     </div>`;
-
+  const summaryHtml = buildExecutiveSummary(summaryRecords, geoInfo);
   const mapDataJson = JSON.stringify(mapData);
   const deadZoneMarkersJson = JSON.stringify(deadZoneMarkers);
 
@@ -968,6 +1097,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
   </button>
   ${techSections}
   ${deadZoneSection}
+  ${summaryHtml}
   <script>
     var __mapData = ${mapDataJson};
     var __dzMarkers = ${deadZoneMarkersJson};
