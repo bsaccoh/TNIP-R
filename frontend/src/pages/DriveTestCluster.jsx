@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Tooltip as LeafletTooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Tooltip as LeafletTooltip } from 'react-leaflet';
 import {
   Box, Card, CardContent, Typography, Stack, Grid, Chip, Alert,
   FormControl, InputLabel, Select, MenuItem, FormGroup, FormControlLabel,
@@ -99,6 +99,14 @@ export function clusterFromName(testName) {
 function FlyTo({ center, zoom }) {
   const map = useMap();
   useEffect(() => { if (center) map.flyTo(center, zoom, { duration: 0.8 }); }, [center, zoom, map]);
+  return null;
+}
+
+// ── Zoom tracker — reports current zoom level to parent ──────────────────────
+function ZoomTracker({ onZoom }) {
+  const map = useMap();
+  useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
+  useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
   return null;
 }
 
@@ -304,16 +312,24 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites
       const found = operators.find((op) => op.operator_name.toLowerCase() === name.toLowerCase());
       return found ? found.operator_id : null;
     }).filter(Boolean);
-    const filteredInv = invSites.filter((s) => opIds.includes(s.operator_id));
+    
+    // Only use inventory for Orange. For others (Africell/Qcell), treat inventory as non-existent/dummy.
+    const isOrange = operatorNames.some(name => /orange/i.test(name));
+    const filteredInv = isOrange ? invSites.filter((s) => opIds.includes(s.operator_id)) : [];
+    
     problemAreas.forEach((a) => {
-      a.locationName = nearestSiteName(a.lat, a.lon, filteredInv, 50) || '';
+      if (isOrange) {
+        a.locationName = nearestSiteName(a.lat, a.lon, filteredInv, 30) || '';
+      } else {
+        a.locationName = '';
+      }
     });
 
     if (problemAreas.length > 0) {
       const list = problemAreas.slice(0, 3).map((a) => {
-        const loc = a.locationName && a.locationName !== '—' && a.locationName !== 'Unknown'
+        const loc = a.locationName && a.locationName.trim() !== '' && a.locationName !== '—' && a.locationName !== 'Unknown'
           ? a.locationName
-          : `coordinates (${a.lat}, ${a.lon})`;
+          : `coordinates (${Number(a.lat).toFixed(5)}, ${Number(a.lon).toFixed(5)})`;
         return `${loc} (avg ${a.avgVal} ${primary.unit || ''})`;
       }).join(', ');
       problemAreaText = ` Coverage falls short of threshold — improvement is needed at: ${list}.`;
@@ -512,9 +528,9 @@ function buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, dea
   let paRemark = '';
   if (problemAreas.length > 0) {
     const list = problemAreas.slice(0, 3).map((a) => {
-      const loc = a.locationName && a.locationName !== '—' && a.locationName !== 'Unknown'
+      const loc = a.locationName && a.locationName.trim() !== '' && a.locationName !== '—' && a.locationName !== 'Unknown'
         ? a.locationName
-        : `coordinates (${a.lat}, ${a.lon})`;
+        : `coordinates (${Number(a.lat).toFixed(5)}, ${Number(a.lon).toFixed(5)})`;
       return `${loc} (avg ${a.avgVal} ${cfg.primary.unit || ''})`;
     }).join(', ');
     paRemark = ` Signal improvements are needed at: <strong>${list}</strong>.`;
@@ -624,10 +640,15 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
       const sPct = secPass?.total ? ((secPass.pass / secPass.total) * 100).toFixed(1) : '—';
 
       const problemAreas = findProblemAreas(opSamples, cfg.primary);
+      const isOrange = /orange/i.test(opName);
       const opId = opNameToId[opName];
-      const opInventory = opId ? invSites.filter((s) => s.operator_id === opId) : [];
+      const opInventory = (isOrange && opId) ? invSites.filter((s) => s.operator_id === opId) : [];
       problemAreas.forEach((a) => {
-        a.locationName = nearestSiteName(a.lat, a.lon, opInventory) || '—';
+        if (isOrange) {
+          a.locationName = nearestSiteName(a.lat, a.lon, opInventory, 30) || '';
+        } else {
+          a.locationName = '';
+        }
       });
       const deadZones = findDeadZones(opSamples, cfg.primary);
       deadZones.forEach((dz) => {
@@ -988,7 +1009,78 @@ export default function DriveTestCluster() {
   const [thresholdCfg, setThresholdCfg] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [invSites, setInvSites] = useState([]);
+  const [mapZoom, setMapZoom] = useState(13);
+  const [areaNames, setAreaNames] = useState({});
 
+  // cfg must be computed before the Nominatim useEffect that depends on screenProblemAreas
+  const cfg = thresholdCfg?.[selectedTech] || thresholdCfg?.['4G'];
+
+  const screenProblemAreas = useMemo(() => {
+    if (!samples.length || !cfg?.primary) return [];
+
+    const opSamples = selectedOps.length > 0
+      ? samples.filter((s) => {
+          const op = operators.find((o) => o.operator_name === s.operator_name);
+          return op ? selectedOps.includes(op.operator_id) : true;
+        })
+      : samples;
+
+    const areas = findProblemAreas(opSamples, cfg.primary);
+
+    areas.forEach((a) => {
+      const clusterSamples = opSamples.filter(
+        (s) => Math.abs(Number(s.latitude) - Number(a.lat)) < 0.002 &&
+               Math.abs(Number(s.longitude) - Number(a.lon)) < 0.002
+      );
+      const opName = clusterSamples[0]?.operator_name ||
+        samples.find((s) => s.latitude === a.lat || s.longitude === a.lon)?.operator_name || '';
+      a._opName = opName;
+
+      const isOrange = /orange/i.test(opName);
+      if (isOrange) {
+        const opId = operators.find((op) => op.operator_name === opName)?.operator_id;
+        const opInv = opId ? invSites.filter((s) => s.operator_id === opId) : [];
+        a.locationName = nearestSiteName(a.lat, a.lon, opInv, 30) || '';
+      } else {
+        a.locationName = `${Number(a.lat).toFixed(5)}°N, ${Math.abs(Number(a.lon)).toFixed(5)}°W`;
+      }
+    });
+    return areas;
+  }, [samples, cfg, selectedOps, invSites, operators]);
+
+  // Reverse-geocode problem areas via Nominatim (OSM) to get street/area names.
+  // Rate-limited to 1 req/s; results cached in areaNames state keyed by "lat,lon".
+  useEffect(() => {
+    if (!screenProblemAreas.length) return;
+    let cancelled = false;
+    const toFetch = screenProblemAreas.filter((a) => {
+      const k = `${a.lat},${a.lon}`;
+      return !areaNames[k] && /orange/i.test(a._opName || '');
+    });
+    if (!toFetch.length) return;
+
+    (async () => {
+      const batch = {};
+      for (const a of toFetch) {
+        if (cancelled) break;
+        const k = `${a.lat},${a.lon}`;
+        try {
+          await new Promise((r) => setTimeout(r, 300));
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${a.lat}&lon=${a.lon}&zoom=17`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          const addr = data.address || {};
+          batch[k] = addr.suburb || addr.neighbourhood || addr.quarter
+            || addr.road || addr.village || addr.town
+            || data.display_name?.split(',')[0] || null;
+        } catch { batch[k] = null; }
+      }
+      if (!cancelled) setAreaNames((prev) => ({ ...prev, ...batch }));
+    })();
+    return () => { cancelled = true; };
+  }, [screenProblemAreas]); // eslint-disable-line
 
   useEffect(() => {
     get('/drive-tests').then((r) => setAllTests(r.data)).catch(() => setAllTests([]));
@@ -996,6 +1088,8 @@ export default function DriveTestCluster() {
     get('/drive-tests/signal-thresholds').then((r) => setThresholdCfg(buildTechCfg(r.data || []))).catch(() => setThresholdCfg(buildTechCfg([])));
     get('/inventory/map').then((r) => setInvSites(r.data || [])).catch(() => {});
   }, []);
+
+
 
   // Derive unique clusters from test names
   const clusters = useMemo(() => {
@@ -1059,36 +1153,12 @@ export default function DriveTestCluster() {
 
   useEffect(() => { setSelectedFileId('all'); }, [selectedTech, selectedCluster, selectedOps]);
 
-  const cfg = thresholdCfg?.[selectedTech] || thresholdCfg?.['4G'];
   const metricCfg = mapMode === 'primary' ? cfg?.primary : cfg?.secondary;
 
   const uniqueOpNames = useMemo(() => {
     const names = new Set(samples.map((s) => s.operator_name).filter(Boolean));
     return [...names];
   }, [samples]);
-
-  const screenProblemAreas = useMemo(() => {
-    if (!samples.length || !cfg?.primary) return [];
-    
-    // Group samples by operator
-    const opSamples = selectedOps.length > 0 
-      ? samples.filter((s) => {
-          const op = operators.find((o) => o.operator_name === s.operator_name);
-          return op ? selectedOps.includes(op.operator_id) : true;
-        })
-      : samples;
-
-    const areas = findProblemAreas(opSamples, cfg.primary);
-    
-    // Resolve location names using the operator inventory loaded in state
-    areas.forEach((a) => {
-      const opName = samples.find(s => s.latitude === a.lat || s.longitude === a.lon)?.operator_name || '';
-      const opId = operators.find(op => op.operator_name === opName)?.operator_id;
-      const opInv = opId ? invSites.filter(s => s.operator_id === opId) : invSites;
-      a.locationName = nearestSiteName(a.lat, a.lon, opInv, 50) || '';
-    });
-    return areas;
-  }, [samples, cfg, selectedOps, invSites, operators]);
 
   if (!allTests || !thresholdCfg) return <Loading height={400} />;
 
@@ -1249,7 +1319,20 @@ export default function DriveTestCluster() {
           {/* Map */}
           <Card sx={{ height: 520 }}>
             <CardContent sx={{ height: '100%', p: '0 !important', position: 'relative' }}>
+              {/* Strip the default Leaflet tooltip bubble from our area labels */}
+              <style>{`
+                .bare-label.leaflet-tooltip {
+                  background: transparent !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  padding: 0 !important;
+                }
+                .bare-label.leaflet-tooltip::before {
+                  display: none !important;
+                }
+              `}</style>
               <MapContainer center={[8.4, -11.8]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <ZoomTracker onZoom={setMapZoom} />
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
                   url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -1279,9 +1362,14 @@ export default function DriveTestCluster() {
                 })}
 
                 {screenProblemAreas.map((a, i) => {
-                  const loc = a.locationName && a.locationName !== 'Unknown' && a.locationName !== '—'
-                    ? a.locationName
-                    : `(${Number(a.lat).toFixed(4)}, ${Number(a.lon).toFixed(4)})`;
+                  const areaKey = `${a.lat},${a.lon}`;
+                  const isNoInv = /qcell|africell/i.test(a._opName || '');
+                  // Area label: Nominatim name → site name → coordinates
+                  const areaLabel = (!isNoInv && areaNames[areaKey])
+                    || (!isNoInv && a.locationName && a.locationName !== '—' ? a.locationName : null)
+                    || `${Number(a.lat).toFixed(4)}°N, ${Math.abs(Number(a.lon)).toFixed(4)}°W`;
+                  // Popup location text
+                  const popupLoc = areaLabel;
                   return (
                     <CircleMarker
                       key={`screen-prob-${i}`}
@@ -1289,15 +1377,20 @@ export default function DriveTestCluster() {
                       radius={8}
                       pathOptions={{ color: '#d32f2f', fillColor: '#d32f2f', fillOpacity: 0.4, weight: 1.5, dashArray: '3,3' }}
                     >
-                      <LeafletTooltip permanent direction="top" offset={[0, -5]} opacity={0.95}>
-                        <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#b71c1c', background: '#fff', padding: '1px 3px', borderRadius: '2px', border: '1px solid #b71c1c' }}>
-                          ⚠️ {loc}
-                        </span>
-                      </LeafletTooltip>
+                      {/* Area name label — only shown when zoomed in (≥ 15) */}
+                      {mapZoom >= 15 && (
+                        <LeafletTooltip permanent direction="top" offset={[0, -8]} className="bare-label">
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#b71c1c', textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff' }}>
+                            ⚠ {areaLabel}
+                          </span>
+                        </LeafletTooltip>
+                      )}
                       <Popup>
                         <div style={{ fontSize: 12 }}>
                           <strong>Worst Coverage Area</strong><br />
-                          Location: {loc}<br />
+                          {areaNames[areaKey] && <><em>{areaNames[areaKey]}</em><br /></>}
+                          Location: {popupLoc}<br />
+                          Operator: {a._opName || '—'}<br />
                           Average: {a.avgVal} {cfg?.primary?.unit}<br />
                           Samples: {a.samples}
                         </div>
