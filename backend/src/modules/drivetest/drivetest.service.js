@@ -89,8 +89,8 @@ export async function resolveCluster(lat, lng) {
   return clusterName;
 }
 
-const RSRP_COL_NAMES = ['rsrp', 'rsrp_dbm', 'rsrp (dbm)', 'lte rsrp', 'serving rsrp', 'rscp', 'rscp_dbm', 'rscp (dbm)'];
-const RSRQ_COL_NAMES = ['rsrq', 'rsrq_db', 'rsrq (db)', 'lte rsrq', 'ecno', 'ecno_db', 'ec/no', 'ec_no'];
+const RSRP_COL_NAMES = ['rsrp', 'rsrp_dbm', 'rsrp (dbm)', 'lte rsrp', 'serving rsrp', 'rscp', 'rscp_dbm', 'rscp (dbm)', 'rxlev', 'rx level', 'rxlevel', 'rx_lev'];
+const RSRQ_COL_NAMES = ['rsrq', 'rsrq_db', 'rsrq (db)', 'lte rsrq', 'ecno', 'ecno_db', 'ec/no', 'ec_no', 'rxqual', 'rx qual', 'rx_qual', 'rxquality'];
 const SINR_COL_NAMES = ['sinr', 'sinr_db', 'sinr (db)', 'lte sinr', 'cinr'];
 const LAT_COL_NAMES = ['latitude', 'lat', 'gps_lat', 'gps latitude'];
 const LON_COL_NAMES = ['longitude', 'lon', 'lng', 'gps_lon', 'gps longitude'];
@@ -186,11 +186,15 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
   fs.writeFileSync(localFilePath, buffer);
   const dbFilePath = `uploads/drivetests/${storedFilename}`;
 
-  const is3G = headers.some(h => {
+  const is2G = headers.some(h => {
     const l = String(h).toLowerCase();
-    return l.includes('rscp') || l.includes('ecno') || l.includes('ec/no') || l.includes('ec_no');
+    return l.includes('rxlev') || l.includes('rx lev') || l.includes('rxqual') || l.includes('rx qual') || l.includes('bsic') || l.includes('arfcn');
   });
-  const detectedTech = is3G ? '3G' : '4G';
+  const is3G = !is2G && headers.some(h => {
+    const l = String(h).toLowerCase();
+    return l.includes('rscp') || l.includes('ecno') || l.includes('ec/no') || l.includes('ec_no') || l.includes('uarfcn');
+  });
+  const detectedTech = is2G ? '2G' : is3G ? '3G' : '4G';
 
   return withTransaction(async ({ q }) => {
     const ins = await q(
@@ -254,7 +258,9 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
     const { calculateOverallScore, generateAiSummary } = await import('./scoring.service.js');
     const samplesForScoring = rows.map(r => ({
       rsrp: rsrpCol ? parseFloat(r[rsrpCol]) : null,
+      rsrq: rsrqCol ? parseFloat(r[rsrqCol]) : null,
       sinr: sinrCol ? parseFloat(r[sinrCol]) : null,
+      dl_throughput: dlCol ? parseFloat(r[dlCol]) : null,
     }));
     const csvTech = meta.technology || null;
     const score = await calculateOverallScore(samplesForScoring, null, csvTech);
@@ -301,7 +307,7 @@ export async function importTrpFile(operatorId, meta, buffer, filename) {
 
     const { calculateOverallScore, generateAiSummary, computeDetailedStats } = await import('./scoring.service.js');
     const score = await calculateOverallScore(parsed.samples, null, technology);
-    const stats = await computeDetailedStats(parsed.samples);
+    const stats = await computeDetailedStats(parsed.samples, null, technology);
     const [opRes] = await q('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
     const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, parsed.summary.distanceKm.toFixed(2), parsed.samples.length, stats, technology);
 
@@ -476,12 +482,26 @@ export async function endLiveTest(driveTestId) {
     ? Math.round((Date.now() - new Date(meta.created_at).getTime()) / 60000)
     : null;
 
+  const liveSamplesForScore = await query(
+    'SELECT rsrp, rsrq, sinr, dl_throughput FROM drive_test_samples WHERE drive_test_id = :id',
+    { id: driveTestId },
+  );
+  const [liveMeta] = await query(
+    `SELECT dt.technology, o.operator_name FROM drive_tests dt
+       JOIN operators o ON o.operator_id = dt.operator_id
+       WHERE dt.drive_test_id = :id`, { id: driveTestId }
+  );
+  const { calculateOverallScore, generateAiSummary } = await import('./scoring.service.js');
+  const score = await calculateOverallScore(liveSamplesForScore, null, liveMeta?.technology);
+  const aiSummary = await generateAiSummary(liveMeta?.operator_name || 'Unknown', score, distKm.toFixed(2), cnt.n, null, liveMeta?.technology);
+
   await query(
     `UPDATE drive_tests SET
        status = 'COMPLETED', total_samples = :s,
-       distance_km = :d, duration_min = :dur
+       distance_km = :d, duration_min = :dur,
+       overall_score = :score, ai_summary = :ai
      WHERE drive_test_id = :id`,
-    { s: cnt.n, d: distKm.toFixed(2), dur: durationMin, id: driveTestId },
+    { s: cnt.n, d: distKm.toFixed(2), dur: durationMin, score, ai: aiSummary, id: driveTestId },
   );
 
   const [updated] = await query(

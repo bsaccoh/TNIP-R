@@ -62,7 +62,7 @@ export async function getBlackspots(threshold = -110, operatorId = null) {
     blackspotCount:   clusters.length,
     totalPoorSamples: rows.length,
     totalSamples:     Number(totRow.total),
-    pctPoor:          Number((rows.length / totRow.total * 100).toFixed(1)),
+    pctPoor:          totRow.total > 0 ? Number((rows.length / totRow.total * 100).toFixed(1)) : 0,
     worstRsrp:        allRsrps.length ? Number(Math.min(...allRsrps).toFixed(1)) : null,
     clusters:         clusters.slice(0, 600),
     rawSamples:       rows.slice(0, 2000).map((r) => ({

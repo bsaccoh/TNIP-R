@@ -33,7 +33,12 @@ export async function getCampaignTrend(operatorId = null) {
       AVG(s.sinr)            AS avg_sinr,
       AVG(s.dl_throughput)   AS avg_dl,
       AVG(s.ul_throughput)   AS avg_ul,
-      SUM(CASE WHEN s.rsrp >= -100 THEN 1 ELSE 0 END) * 100.0
+      SUM(CASE
+            WHEN dt.technology = '2G' AND s.rsrp >= -85  THEN 1
+            WHEN dt.technology = '3G' AND s.rsrp >= -90  THEN 1
+            WHEN s.rsrp >= -100 THEN 1
+            ELSE 0
+          END) * 100.0
         / NULLIF(COUNT(s.sample_id), 0) AS coverage_pct
     FROM drive_tests dt
     JOIN operators o ON dt.operator_id = o.operator_id

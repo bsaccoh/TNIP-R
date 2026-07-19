@@ -14,10 +14,19 @@ const findCol = (headers, aliases) => headers.find((h) => aliases.includes(norm(
 
 function toTimestamp(row, headers, timeCol, dateCol) {
   if (timeCol && row[timeCol]) {
-    // Huawei often emits "2026-06-01 00:00:00" or "06/01/2026 00:00"
     const v = String(row[timeCol]).trim();
-    const d = new Date(v.replace(/\//g, '-'));
-    if (!isNaN(d)) return d;
+    // ISO-like: "2026-06-01 00:00:00" → append Z for UTC
+    if (/^\d{4}-/.test(v)) {
+      const d = new Date(v.replace(' ', 'T') + 'Z');
+      if (!isNaN(d)) return d;
+    }
+    // MM/DD/YYYY [HH:MM[:SS]] — slash-to-dash produces invalid ISO; parse explicitly
+    const mdy = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (mdy) {
+      const [, mo, dy, yr, hh = '0', mm = '0', ss = '0'] = mdy;
+      const d = new Date(`${yr}-${mo.padStart(2, '0')}-${dy.padStart(2, '0')}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:${ss.padStart(2, '0')}Z`);
+      if (!isNaN(d)) return d;
+    }
   }
   if (dateCol && row[dateCol]) {
     const d = new Date(String(row[dateCol]).trim());

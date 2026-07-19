@@ -28,7 +28,18 @@ export async function listTestsForCorridor() {
   );
 }
 
+// Technology-aware coverage and quality thresholds
+const TECH_THRESHOLDS = {
+  '2G': { coverage: -85,  good: -85,  fair: -95,  poor: -105 },
+  '3G': { coverage: -90,  good: -90,  fair: -100, poor: -110 },
+  '4G': { coverage: -100, good: -90,  fair: -100, poor: -110 },
+};
+
 export async function getCorridorAnalysis(driveTestId, numSegments = 20) {
+  const [testRow] = await query('SELECT technology FROM drive_tests WHERE drive_test_id = ?', [driveTestId]);
+  const tech = testRow?.technology || '4G';
+  const thr = TECH_THRESHOLDS[tech] || TECH_THRESHOLDS['4G'];
+
   const rows = await query(
     `SELECT s.latitude, s.longitude, s.ts, s.rsrp, s.rsrq, s.sinr,
             s.dl_throughput, s.ul_throughput
@@ -90,12 +101,12 @@ export async function getCorridorAnalysis(driveTestId, numSegments = 20) {
       avgDl:      avg(dls)   != null ? Math.round(avg(dls)) : null,
       minRsrp:    rsrps.length ? Number(Math.min(...rsrps).toFixed(1)) : null,
       coveragePct: rsrps.length
-        ? Number((rsrps.filter((v) => v >= -100).length / rsrps.length * 100).toFixed(1))
+        ? Number((rsrps.filter((v) => v >= thr.coverage).length / rsrps.length * 100).toFixed(1))
         : null,
       quality: avgRsrp == null ? 'unknown'
-        : avgRsrp >= -90  ? 'good'
-        : avgRsrp >= -100 ? 'fair'
-        : avgRsrp >= -110 ? 'poor'
+        : avgRsrp >= thr.good ? 'good'
+        : avgRsrp >= thr.fair ? 'fair'
+        : avgRsrp >= thr.poor ? 'poor'
         : 'dead',
       points: seg.map((p) => ({ lat: p.lat, lon: p.lon, rsrp: p.rsrp })),
     });

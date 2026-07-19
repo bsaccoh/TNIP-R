@@ -95,7 +95,7 @@ export function parseHuaweiPmResult(buffer, fileName = '', opts = {}) {
     if (!isReliable && !includeUnreliable) { skipped++; continue; }
 
     const tsRaw = idx.time >= 0 ? row[idx.time] : null;
-    const ts = tsRaw ? new Date(String(tsRaw).replace(' ', 'T')) : null;
+    const ts = tsRaw ? new Date(String(tsRaw).replace(' ', 'T') + 'Z') : null;
     const obj = parseObjectName(idx.object >= 0 ? row[idx.object] : '');
 
     const counters = {};

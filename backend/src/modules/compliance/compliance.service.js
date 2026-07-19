@@ -33,7 +33,11 @@ function selectThreshold(thresholds, kpiId, operatorId, technologyId) {
     (t.operator_id == null || t.operator_id === operatorId) &&
     (t.technology_id == null || t.technology_id === technologyId));
   if (!candidates.length) return null;
-  candidates.sort((a, b) => (b.operator_id ? 1 : 0) - (a.operator_id ? 1 : 0));
+  candidates.sort((a, b) => {
+    const opDiff = (b.operator_id ? 1 : 0) - (a.operator_id ? 1 : 0);
+    if (opDiff !== 0) return opDiff;
+    return (b.technology_id ? 1 : 0) - (a.technology_id ? 1 : 0);
+  });
   return candidates[0];
 }
 

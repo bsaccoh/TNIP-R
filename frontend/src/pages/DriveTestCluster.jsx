@@ -16,7 +16,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as RTooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
-import { get } from '../api/client';
+import { get, api } from '../api/client';
 import { Loading, EmptyState } from '../components/ui';
 import { colorFor } from '../theme';
 
@@ -48,7 +48,7 @@ export function buildTechCfg(rows) {
     },
     '2G': {
       primary: toMetric(map['2G/rsrq']),
-      secondary: null,
+      secondary: toMetric(map['2G/rsrp']),
     },
   };
 }
@@ -272,7 +272,7 @@ function DistributionTable({ samples, tech, mapMode, techCfg }) {
 }
 
 // ── Auto remarks ─────────────────────────────────────────────────────────────
-function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg }) {
+function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites = [] }) {
   const cfg = techCfg;
   const primary = cfg?.primary;
   const secondary = cfg?.secondary;
@@ -297,17 +297,38 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg }) {
 
   const opList = operatorNames.join(', ');
 
+  let problemAreaText = '';
+  if (!primaryMet) {
+    const problemAreas = findProblemAreas(samples, primary);
+    const filteredInv = invSites.filter((s) => operatorNames.includes(s.operator_name));
+    problemAreas.forEach((a) => {
+      a.locationName = nearestSiteName(a.lat, a.lon, filteredInv) || '—';
+    });
+
+    if (problemAreas.length > 0) {
+      const list = problemAreas.slice(0, 3).map((a) => {
+        const loc = a.locationName && a.locationName !== '—' && a.locationName !== 'Unknown'
+          ? a.locationName
+          : `coordinates (${a.lat}, ${a.lon})`;
+        return `${loc} (avg ${a.avgVal} ${primary.unit || ''})`;
+      }).join(', ');
+      problemAreaText = ` Coverage falls short of threshold — improvement is needed at: ${list}.`;
+    } else {
+      problemAreaText = ' Coverage falls short of threshold — improvement is needed in areas shown in red/orange on the map.';
+    }
+  } else {
+    problemAreaText = ' Coverage meets regulatory threshold.';
+  }
+
   return (
     <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 2, mt: 1 }}>
       <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Remarks</Typography>
       <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
         <strong>{tech} network coverage in {cluster || 'the selected cluster'}.</strong>{' '}
         {opList} — coverage signal strength ({primary.label} {primary.passMin != null ? `≥ ${primary.passMin}` : `≤ ${primary.passMax}`} {primary.unit} → <strong>{primaryPct}%</strong>).{' '}
-        {primaryMet
-          ? 'Coverage meets regulatory threshold.'
-          : 'Coverage falls short of threshold — improvement is needed in areas shown in red/orange on the map.'}
+        <strong>{problemAreaText}</strong>
         {secText}
-        {' '}-{Math.abs(primary.passMin ?? primary.passMax)} {primary.unit} or better is required for quality connection.
+        {' '}{primary.passLabel} is required for quality connection.
       </Typography>
     </Box>
   );
@@ -484,9 +505,16 @@ function buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, dea
     ? ` <strong>${deadZoneCount}</strong> dead zone cluster${deadZoneCount > 1 ? 's' : ''} were identified where signal falls below the worst-tier threshold — these locations should be prioritised for site survey and remediation (antenna tilt adjustment, additional nodes, or repeater deployment).`
     : ' No dead zones were detected on the measured route.';
 
-  const paRemark = problemAreas.length > 0
-    ? ` The top problem area recorded an average ${primLabel} of <strong>${problemAreas[0].avgVal} ${cfg.primary.unit || ''}</strong> at coordinates (${problemAreas[0].lat}, ${problemAreas[0].lon}).`
-    : '';
+  let paRemark = '';
+  if (problemAreas.length > 0) {
+    const list = problemAreas.slice(0, 3).map((a) => {
+      const loc = a.locationName && a.locationName !== '—' && a.locationName !== 'Unknown'
+        ? a.locationName
+        : `coordinates (${a.lat}, ${a.lon})`;
+      return `${loc} (avg ${a.avgVal} ${cfg.primary.unit || ''})`;
+    }).join(', ');
+    paRemark = ` Signal improvements are needed at: <strong>${list}</strong>.`;
+  }
 
   return `
     <div style="margin-top:10px;padding:8px 12px;border-left:4px solid ${statusColor};background:#fafafa;font-size:10px;color:#222;">
@@ -641,7 +669,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
               </tr>`).join('')}
               <tr style="background:#e8eef8;font-weight:bold;">
                 <td colspan="2" style="padding:3px 6px;border:1px solid #ddd;">Total</td>
-                <td style="padding:3px 6px;border:1px solid #ddd;text-align:right;">${opSamples.length.toLocaleString()}</td>
+                <td style="padding:3px 6px;border:1px solid #ddd;text-align:right;">${rows.reduce((s, r) => s + r.count, 0).toLocaleString()}</td>
                 <td style="padding:3px 6px;border:1px solid #ddd;text-align:right;">100%</td>
               </tr>
             </tbody>
@@ -754,6 +782,18 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
   const dzSevCount  = allDeadZones.filter((d) => d.samples >= 5 && d.samples < 10).length;
   const dzPoorCount = allDeadZones.filter((d) => d.samples < 5).length;
 
+  // Build dead zone threshold description from actual configured thresholds
+  const dzThreshParts = availableTechs.map((t) => {
+    const c = thresholdCfg?.[t]?.primary;
+    if (!c?.bins?.length) return null;
+    const secondLast = c.bins[c.bins.length - 2];
+    if (!secondLast) return null;
+    const dir = secondLast.max != null
+      ? `&gt; ${secondLast.max} ${c.unit || ''}`.trim()
+      : `&lt; ${secondLast.min} ${c.unit || ''}`.trim();
+    return `${c.label} ${dir} (${t})`;
+  }).filter(Boolean).join(', ');
+
   const deadZoneSection = allDeadZones.length ? `
     <div style="page-break-before:always;">
       <h2 style="font-size:14px;color:#fff;background:#7b1c1c;padding:8px 12px;margin:0 0 8px 0;border-radius:3px;">
@@ -762,7 +802,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
       <p style="font-size:11px;color:#444;margin-bottom:10px;">
         Dead zones are geographic locations where signal strength falls into the worst measurable tier, representing areas with severely
         degraded or completely unusable network coverage. Clusters (~200m × 200m grid cells) were identified where measured signal
-        consistently breached worst-tier thresholds: RSCP &lt; −105 dBm (3G), RSRP &lt; −100 dBm (4G), RxQual &gt; 5 (2G).
+        consistently breached worst-tier thresholds: ${dzThreshParts}.
         Circle size is proportional to sample density. Hover a circle for operator, technology, and signal value detail.
         Priority remediation: antenna tilt adjustment, additional macro/micro sites, or repeater/booster deployment.
       </p>
@@ -887,23 +927,16 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
 
   if (options.download) {
     try {
-      const res = await window.fetch('http://localhost:3000/api/drive-tests/report/cluster/pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('tnip_token')}`
-        },
-        body: JSON.stringify({
-          html: htmlStr,
-          filename: `DT_Report_${geo}_${dateStr.replace(/\\s/g, '_')}.pdf`
-        })
-      });
-      if (!res.ok) throw new Error('PDF generation failed');
-      const blob = await res.blob();
+      const pdfFilename = `DT_Report_${geo}_${dateStr.replace(/\s/g, '_')}.pdf`;
+      const res = await api.post('/drive-tests/report/cluster/pdf', {
+        html: htmlStr,
+        filename: pdfFilename,
+      }, { responseType: 'blob' });
+      const blob = res.data;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `DT_Report_${geo}_${dateStr.replace(/\\s/g, '_')}.pdf`;
+      a.download = pdfFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -933,12 +966,14 @@ export default function DriveTestCluster() {
   const [flyTarget, setFlyTarget]   = useState(null);
   const [thresholdCfg, setThresholdCfg] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [invSites, setInvSites] = useState([]);
 
 
   useEffect(() => {
     get('/drive-tests').then((r) => setAllTests(r.data)).catch(() => setAllTests([]));
     get('/operators').then((r) => setOperators(r.data?.rows || r.data || [])).catch(() => setOperators([]));
     get('/drive-tests/signal-thresholds').then((r) => setThresholdCfg(buildTechCfg(r.data || []))).catch(() => setThresholdCfg(buildTechCfg([])));
+    get('/inventory/map').then((r) => setInvSites(r.data || [])).catch(() => {});
   }, []);
 
   // Derive unique clusters from test names
@@ -1326,6 +1361,7 @@ export default function DriveTestCluster() {
                           cluster={selectedCluster}
                           operatorNames={[opName]}
                           techCfg={cfg}
+                          invSites={invSites}
                         />
                       </CardContent>
                     </Card>

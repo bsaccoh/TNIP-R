@@ -102,9 +102,13 @@ async function ingestPmResult({ operatorId, fileName, buffer, uploadedBy, hash }
   if (!parsed.records.length) throw ApiError.badRequest('No reliable data rows in pmresult file');
 
   const fileMeta = parsePmResultFilename(fileName);
-  // Technology from first record's NodeB prefix, else default 3G/UMTS (sample domain).
-  const technologyId = techFromNodeB(parsed.records.find((r) => r.nodeBName)?.nodeBName) || TECH['3G'];
-  const granularity = parsed.granularityMin === 30 ? '30MIN' : 'HOUR';
+  // Technology from NodeB prefix — scan multiple records before defaulting to 3G.
+  const detectedTechId = parsed.records.reduce((found, r) => {
+    if (found) return found;
+    return techFromNodeB(r.nodeBName);
+  }, null);
+  const technologyId = detectedTechId || TECH['3G'];
+  const granularity = parsed.granularityMin === 15 ? '15MIN' : parsed.granularityMin === 30 ? '30MIN' : 'HOUR';
 
   const metaByKey = {};
   for (const id of parsed.counterIds) {
@@ -194,7 +198,12 @@ async function ingestPmResult({ operatorId, fileName, buffer, uploadedBy, hash }
 async function ingestNamedCsv({ operatorId, fileName, buffer, uploadedBy, hash }) {
   const parsed = parseHuaweiPmCsv(buffer);
   if (!parsed.records.length) throw ApiError.badRequest('No data rows found in CSV');
-  const technologyId = TECH['4G'];
+  // Detect tech from enodeb names in parsed records; default to 4G if undetectable.
+  const csvTechId = parsed.records.reduce((found, r) => {
+    if (found) return found;
+    return techFromNodeB(r.enodeb);
+  }, null);
+  const technologyId = csvTechId || TECH['4G'];
 
   return withTransaction(async ({ q, conn }) => {
     const fileRes = await q(

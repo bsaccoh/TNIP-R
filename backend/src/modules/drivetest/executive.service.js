@@ -36,7 +36,12 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
             SUM(CASE WHEN rsrp >= ? AND rsrp < ? THEN 1 ELSE 0 END) AS fair,
             SUM(CASE WHEN rsrp >= ? AND rsrp < ? THEN 1 ELSE 0 END) AS poor,
             SUM(CASE WHEN rsrp < ? THEN 1 ELSE 0 END) AS noSignal,
-            SUM(CASE WHEN rsrp >= ? THEN 1 ELSE 0 END) AS rsrpPass,
+            SUM(CASE
+              WHEN dt.technology = '2G' AND s.rsrp >= -85  THEN 1
+              WHEN dt.technology = '3G' AND s.rsrp >= -90  THEN 1
+              WHEN s.rsrp >= -100 THEN 1
+              ELSE 0
+            END) AS rsrpPass,
             SUM(CASE WHEN sinr >= ? THEN 1 ELSE 0 END) AS sinrPass,
             SUM(CASE WHEN dl_throughput >= ? THEN 1 ELSE 0 END) AS dlPass,
             SUM(CASE WHEN event_type = 'CALL_DROP' THEN 1 ELSE 0 END) AS callDrops,
@@ -49,7 +54,7 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
      c.rsrp_fair, c.rsrp_good,
      c.rsrp_poor, c.rsrp_fair,
      c.rsrp_poor,
-     c.rsrp_threshold, c.sinr_threshold, c.dl_threshold,
+     c.sinr_threshold, c.dl_threshold,
      ...opArgs]);
 
   const total = kpi?.totalSamples || 1;
@@ -68,8 +73,10 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
   const qualityScore = Math.round((sinrPct / 100) * 25);
   const dlPct = pct(fmt(kpi?.dlPass), total);
   const throughputScore = Math.round((dlPct / 100) * 20);
-  const reliabilityScore = Math.round(Math.min(15, 15 * (1 - fmt(kpi?.callDrops) / Math.max(total, 1) * 100)));
+  const dropRate = fmt(kpi?.callDrops) / Math.max(total, 1);
+  const reliabilityScore = Math.max(0, Math.round(15 * (1 - dropRate * 100)));
   const eventsScore = Math.max(0, 10 - Math.round(fmt(kpi?.callDrops) * 0.5));
+  const computedFinalScore = coverageScore + qualityScore + throughputScore + reliabilityScore + eventsScore;
 
   const dlTargetMbps = c.dl_threshold / 1000;
   const ulTargetMbps = c.ul_threshold / 1000;
@@ -156,8 +163,8 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
         { category: 'Reliability', weight: '15%', score: reliabilityScore },
         { category: 'Events', weight: '10%', score: eventsScore },
       ],
-      finalScore,
-      rating: `${finalScore >= 90 ? '★★★★★' : finalScore >= 75 ? '★★★★' : finalScore >= 60 ? '★★★' : finalScore >= 40 ? '★★' : '★'} ${rating}`,
+      finalScore: computedFinalScore,
+      rating: `${computedFinalScore >= 90 ? '★★★★★' : computedFinalScore >= 75 ? '★★★★' : computedFinalScore >= 60 ? '★★★' : computedFinalScore >= 40 ? '★★' : '★'} ${computedFinalScore >= 90 ? 'Excellent' : computedFinalScore >= 75 ? 'Good' : computedFinalScore >= 60 ? 'Fair' : 'Poor'}`,
     },
     aiSummary: buildAiSummary(operatorName, overview, kpi, total, coveragePct, finalScore, rating, c),
   };
@@ -290,12 +297,16 @@ export async function getOperatorComparisonDashboard() {
               ROUND(AVG(s.dl_throughput)/1000, 1) AS avgDlMbps,
               ROUND(AVG(s.ul_throughput)/1000, 1) AS avgUlMbps,
               COUNT(*) AS totalSamples,
-              SUM(CASE WHEN s.rsrp >= ? THEN 1 ELSE 0 END) AS rsrpPass
+              SUM(CASE
+                WHEN dt2.technology = '2G' AND s.rsrp >= -85  THEN 1
+                WHEN dt2.technology = '3G' AND s.rsrp >= -90  THEN 1
+                ELSE CASE WHEN s.rsrp >= -100 THEN 1 ELSE 0 END
+              END) AS rsrpPass
        FROM drive_test_samples s
        JOIN drive_tests dt2 ON dt2.drive_test_id = s.drive_test_id
        WHERE dt2.status = 'COMPLETED' GROUP BY dt2.operator_id
      ) s_agg ON s_agg.operator_id = o.operator_id
-     ORDER BY s_agg.avgRsrp DESC`, [c.rsrp_threshold]);
+     ORDER BY s_agg.avgRsrp DESC`, []);
 
   return rows.map(r => ({
     operator: r.operator,

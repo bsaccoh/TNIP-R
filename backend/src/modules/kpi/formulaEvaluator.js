@@ -149,6 +149,9 @@ export function evaluateFormula(expression, values) {
 export function validateFormula(expression) {
   const keys = extractCounterKeys(expression);
   const dummy = new Map(keys.map((k) => [k, 1]));
-  evaluateFormula(expression, dummy);
+  const result = evaluateFormula(expression, dummy);
+  if (result == null || !Number.isFinite(result)) {
+    return { ok: false, error: 'Formula evaluates to null or non-finite value with sample inputs' };
+  }
   return { ok: true, counterKeys: keys };
 }

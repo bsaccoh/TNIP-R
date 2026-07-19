@@ -12,8 +12,9 @@ const REGION_BOUNDS = {
 function detectRegionFromCoords(lat, lon) {
   if (lat >= 8.3 && lat <= 8.6 && lon >= -13.4 && lon <= -13.0) return 'Western Area';
   if (lat > 8.6) return 'Northern';
+  if (lat < 8.3 && lon > -12.5 && lon <= -11.5) return 'Southern';
   if (lat < 9.0 && lon > -11.5) return 'Eastern';
-  if (lat < 8.3 && lon > -12.5) return 'Southern';
+  if (lat < 8.3 && lon <= -12.5) return 'Southern';
   return null;
 }
 
@@ -255,7 +256,11 @@ export async function getRegionalDetail(regionId) {
       o.operator_name     AS operatorName,
       COUNT(DISTINCT dt.drive_test_id) AS tests,
       COUNT(s.sample_id)  AS samples,
-      ROUND(SUM(DISTINCT dt.distance_km), 2) AS distance,
+      ROUND((SELECT COALESCE(SUM(dt2.distance_km),0) FROM drive_tests dt2
+             WHERE dt2.operator_id = o.operator_id AND dt2.status = 'COMPLETED'
+               AND dt2.drive_test_id IN (
+                 SELECT DISTINCT s2.drive_test_id FROM drive_test_samples s2 WHERE ${rFilter}
+               )), 2) AS distance,
       AVG(dt.overall_score) AS avgScore,
       AVG(s.rsrp)         AS avgRsrp,
       AVG(s.rsrq)         AS avgRsrq,
@@ -675,12 +680,13 @@ export function generateRegionalAiSummary(regionName, overview, operators, confi
     }
   }
 
-  // Key KPI findings
-  const avgRsrpAll = operators.length > 0
-    ? operators.reduce((s, o) => s + (o.kpi.avgRsrp || 0), 0) / operators.length
+  // Key KPI findings — weight by sample count so large operators are not under-represented
+  const totalOpSamples = operators.reduce((s, o) => s + (o.samples || 0), 0);
+  const avgRsrpAll = totalOpSamples > 0
+    ? operators.reduce((s, o) => s + ((o.kpi.avgRsrp || 0) * (o.samples || 0)), 0) / totalOpSamples
     : null;
-  const avgCoverage = operators.length > 0
-    ? operators.reduce((s, o) => s + (o.coverage?.coveragePct || 0), 0) / operators.length
+  const avgCoverage = totalOpSamples > 0
+    ? operators.reduce((s, o) => s + ((o.coverage?.coveragePct || 0) * (o.samples || 0)), 0) / totalOpSamples
     : 0;
 
   if (avgRsrpAll != null) {

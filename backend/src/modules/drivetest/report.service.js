@@ -16,10 +16,11 @@ function regionSqlFilter(regionId) {
 }
 
 function detectRegionFromCoords(lat, lon) {
-  if (lat >= 8.3 && lat <= 8.6 && lon >= -13.4 && lon <= -13.0) return 1;
-  if (lat > 8.6) return 2;
-  if (lat < 9.0 && lon > -11.5) return 4;
-  if (lat < 8.3 && lon > -12.5) return 3;
+  if (lat >= 8.3 && lat <= 8.6 && lon >= -13.4 && lon <= -13.0) return 1; // Western
+  if (lat > 8.6) return 2;                                                  // Northern
+  if (lat < 8.3 && lon > -12.5 && lon <= -11.5) return 3;                  // Southern (check before Eastern to resolve overlap)
+  if (lat < 9.0 && lon > -11.5) return 4;                                   // Eastern
+  if (lat < 8.3 && lon <= -12.5) return 3;                                  // Southern (western part)
   return null;
 }
 
@@ -57,11 +58,11 @@ export async function getReportData(regionId = null) {
            ROUND(SUM(distance_km), 2) AS totalDistance,
            ROUND(AVG(overall_score), 2) AS avgScore
     FROM drive_tests dt
-    WHERE status = 'completed' ${dtFilter}`);
+    WHERE status = 'COMPLETED' ${dtFilter}`);
   const [sampleCount = {}] = await query(`
     SELECT COUNT(*) AS totalSamples
     FROM drive_test_samples s
-    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'completed'
+    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'COMPLETED'
     WHERE 1=1 ${regionFilter}`);
   const overview = { ...dtOverview, totalSamples: sampleCount.totalSamples || 0 };
 
@@ -93,7 +94,7 @@ export async function getReportData(regionId = null) {
     FROM drive_tests dt
     JOIN operators o ON o.operator_id = dt.operator_id
     JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
-    WHERE dt.status = 'completed' ${regionFilter}
+    WHERE dt.status = 'COMPLETED' ${regionFilter}
     GROUP BY o.operator_id, o.operator_name
     ORDER BY score DESC`;
 
@@ -110,7 +111,7 @@ export async function getReportData(regionId = null) {
 
   const operators = opRows.map(o => {
     const tm = o.totalMeasurements || 1;
-    const coveragePct = Number(((tm - (o.noSignal || 0)) / tm * 100).toFixed(1));
+    const coveragePct = Number(((o.rsrpPass || 0) / tm * 100).toFixed(1));
     const rating = o.score >= 90 ? 'Excellent' : o.score >= 75 ? 'Good' : o.score >= 60 ? 'Fair' : 'Poor';
     return {
       name: o.name,
@@ -142,7 +143,7 @@ export async function getReportData(regionId = null) {
     const allSql = `
       SELECT s.latitude, s.longitude, s.rsrp, dt.overall_score, dt.drive_test_id, o.operator_name
       FROM drive_test_samples s
-      JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'completed'
+      JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'COMPLETED'
       JOIN operators o ON o.operator_id = dt.operator_id
       WHERE s.latitude IS NOT NULL`;
     const allRows = await query(allSql);
@@ -152,12 +153,13 @@ export async function getReportData(regionId = null) {
       if (!rid) continue;
       if (!buckets[rid]) buckets[rid] = { name: REGION_BOUNDS[rid].name, tests: new Set(), scores: [], rsrpPass: 0, total: 0, opScores: {} };
       const b = buckets[rid];
+      const isNewTest = !b.tests.has(row.drive_test_id);
       b.tests.add(row.drive_test_id);
-      b.scores.push(row.overall_score);
+      if (isNewTest && row.overall_score != null) b.scores.push(row.overall_score);
       b.total++;
       if (row.rsrp >= config.rsrp_threshold) b.rsrpPass++;
       if (!b.opScores[row.operator_name]) b.opScores[row.operator_name] = [];
-      b.opScores[row.operator_name].push(row.overall_score);
+      if (isNewTest && row.overall_score != null) b.opScores[row.operator_name].push(row.overall_score);
     }
     regions = Object.values(buckets).map(b => {
       const avgScore = b.scores.length ? Number((b.scores.reduce((a, c) => a + c, 0) / b.scores.length).toFixed(2)) : 0;
@@ -177,29 +179,29 @@ export async function getReportData(regionId = null) {
            CASE
              WHEN AVG(s.rsrp) < ? THEN 'No Signal / Very Weak Coverage'
              WHEN AVG(s.rsrp) < ? THEN 'Poor Coverage'
-             WHEN AVG(s.sinr) < 0 THEN 'High Interference'
+             WHEN AVG(s.sinr) < ? THEN 'High Interference'
              WHEN AVG(s.dl_throughput) < ? THEN 'Low Throughput'
              ELSE 'Marginal'
            END AS issue,
            CASE
              WHEN AVG(s.rsrp) < ? THEN 'Critical'
              WHEN AVG(s.rsrp) < ? THEN 'High'
-             WHEN AVG(s.sinr) < 0 THEN 'High'
+             WHEN AVG(s.sinr) < ? THEN 'High'
              ELSE 'Medium'
            END AS severity,
            COUNT(*) AS sampleCount
     FROM drive_test_samples s
-    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'completed'
+    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'COMPLETED'
     WHERE s.rsrp IS NOT NULL ${regionFilter}
     GROUP BY lat, lon
-    HAVING AVG(s.rsrp) < ? OR AVG(s.sinr) < 0 OR AVG(s.dl_throughput) < ?
+    HAVING AVG(s.rsrp) < ? OR AVG(s.sinr) < ? OR AVG(s.dl_throughput) < ?
     ORDER BY severity DESC, sampleCount DESC
     LIMIT 10`;
 
   const probParams = [
-    config.rsrp_poor, config.rsrp_fair, config.dl_threshold,
-    config.rsrp_poor, config.rsrp_fair,
-    config.rsrp_fair, config.dl_threshold,
+    config.rsrp_poor, config.rsrp_fair, config.sinr_threshold, config.dl_threshold,
+    config.rsrp_poor, config.rsrp_fair, config.sinr_threshold,
+    config.rsrp_fair, config.sinr_threshold, config.dl_threshold,
   ];
   const probRows = await query(probSql, probParams);
 
@@ -225,7 +227,7 @@ export async function getReportData(regionId = null) {
            s.pci, s.rtt_ms, s.jitter_ms, s.packet_loss_pct, s.mos,
            s.event_type, s.call_status, o.operator_name AS operator
     FROM drive_test_samples s
-    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'completed'
+    JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'COMPLETED'
     JOIN operators o ON o.operator_id = dt.operator_id
     WHERE 1=1 ${regionFilter}
     ORDER BY s.ts DESC

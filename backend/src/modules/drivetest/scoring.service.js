@@ -58,11 +58,11 @@ export function clearConfigCache() {
 async function loadSignalThresholds(technology) {
   const tech = technology || '4G';
   const techRows = await query(
-    `SELECT metric, pass_value, pass_direction FROM signal_thresholds WHERE technology = :tech`,
+    `SELECT metric, pass_value, pass_direction, unit FROM signal_thresholds WHERE technology = :tech`,
     { tech }
   ).catch(() => []);
   const allRows = await query(
-    `SELECT metric, pass_value, pass_direction FROM signal_thresholds WHERE technology = 'ALL'`
+    `SELECT metric, pass_value, pass_direction, unit FROM signal_thresholds WHERE technology = 'ALL'`
   ).catch(() => []);
 
   const result = {};
@@ -71,7 +71,12 @@ async function loadSignalThresholds(technology) {
               : r.metric === 'ul_throughput' ? 'ul'
               : r.metric; // rsrp, rsrq, sinr
     if (!result[key]) {
-      result[key] = { pass_value: Number(r.pass_value), pass_direction: r.pass_direction };
+      let passValue = Number(r.pass_value);
+      // DB stores DL/UL in kbps; if signal_thresholds.unit is Mbps, convert
+      if ((key === 'dl' || key === 'ul') && /mbps/i.test(r.unit || '')) {
+        passValue = passValue * 1000;
+      }
+      result[key] = { pass_value: passValue, pass_direction: r.pass_direction };
     }
   }
   return result;
@@ -123,8 +128,22 @@ export async function calculateOverallScore(samples, cfg, technology) {
   return Number((totalScore / totalWeight).toFixed(2));
 }
 
-export async function computeDetailedStats(samples, cfg) {
+// Per-technology RSRP/signal distribution thresholds.
+const TECH_DIST = {
+  '2G': { excellent: -70, good: -80, fair: -90, poor: -100 }, // RxLevel (dBm)
+  '3G': { excellent: -75, good: -85, fair: -95, poor: -105 }, // RSCP (dBm)
+  '4G': null, // use config values
+};
+
+export async function computeDetailedStats(samples, cfg, technology) {
   const c = cfg || await loadConfig();
+  const tech = technology || '4G';
+  const td = TECH_DIST[tech] || TECH_DIST['4G'];
+  const ex  = td ? td.excellent : c.rsrp_excellent;
+  const gd  = td ? td.good      : c.rsrp_good;
+  const fa  = td ? td.fair      : c.rsrp_fair;
+  const po  = td ? td.poor      : c.rsrp_poor;
+
   const vals = { rsrp: [], rsrq: [], sinr: [], dl: [], ul: [] };
   for (const s of samples) {
     if (s.rsrp != null) vals.rsrp.push(Number(s.rsrp));
@@ -142,14 +161,18 @@ export async function computeDetailedStats(samples, cfg) {
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   };
 
+  // 3G-specific distribution helpers (use tech-aware thresholds from signal_thresholds at runtime)
+  const rscpPassVal = tech === '3G' ? -70 : (tech === '2G' ? -70 : -70);
+  const ecnoMin = -12, ecnoMax = 15;
+
   const dist = {
-    excellent: vals.rsrp.filter(v => v >= c.rsrp_excellent).length,
-    good:      vals.rsrp.filter(v => v >= c.rsrp_good && v < c.rsrp_excellent).length,
-    fair:      vals.rsrp.filter(v => v >= c.rsrp_fair && v < c.rsrp_good).length,
-    poor:      vals.rsrp.filter(v => v >= c.rsrp_poor && v < c.rsrp_fair).length,
-    noSignal:  vals.rsrp.filter(v => v < c.rsrp_poor).length,
-    rscpGte70: vals.rsrp.filter(v => v >= -70).length,
-    ecnoBetween: vals.rsrq.filter(v => v >= -12 && v <= 15).length,
+    excellent: vals.rsrp.filter(v => v >= ex).length,
+    good:      vals.rsrp.filter(v => v >= gd && v < ex).length,
+    fair:      vals.rsrp.filter(v => v >= fa && v < gd).length,
+    poor:      vals.rsrp.filter(v => v >= po && v < fa).length,
+    noSignal:  vals.rsrp.filter(v => v < po).length,
+    rscpGte70:    vals.rsrp.filter(v => v >= rscpPassVal).length,
+    ecnoBetween:  vals.rsrq.filter(v => v >= ecnoMin && v <= ecnoMax).length,
   };
 
   return {
@@ -214,12 +237,15 @@ export async function generateAiSummary(operatorName, score, distance, numSample
 
   if (tech === '3G' && detailedStats) {
     const s = detailedStats;
+    const thresholds3G = await loadSignalThresholds('3G');
+    const rscpThresh = thresholds3G.rsrp?.pass_value ?? -70;
+    const ecnoThresh = thresholds3G.rsrq?.pass_value ?? -12;
     const rscpPct = ((s.distribution.rscpGte70 / (numSamples || 1)) * 100).toFixed(1);
     const ecnoPct = ((s.distribution.ecnoBetween / (numSamples || 1)) * 100).toFixed(1);
     const shortOfThreshold = rscpPct < 90 ? `${operatorName} short of threshold.` : `${operatorName} meets threshold.`;
-    
+
     return `Remarks: 3G network coverage.
-Coverage signal strength (RSCP ≥-70dBm→${rscpPct}%). ${shortOfThreshold} More improvement needs to be done on ECNO as shown on plots in most areas etc. Degraded Signal quality as shown in most areas on ECNO plot also needs improvement. ECNO between -12 dB and 15 dB, accounts only ${ecnoPct}%. -10dB or higher is better`;
+Coverage signal strength (RSCP ≥${rscpThresh}dBm→${rscpPct}%). ${shortOfThreshold} More improvement needs to be done on ECNO as shown on plots in most areas etc. Degraded Signal quality as shown in most areas on ECNO plot also needs improvement. ECNO ≥${ecnoThresh} dB accounts for ${ecnoPct}%. ${ecnoThresh} dB or higher is better`;
   }
 
   return summary;
