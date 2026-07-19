@@ -25,8 +25,9 @@ import DriveTestConfig from './pages/DriveTestConfig';
 import DriveTestRegional from './pages/DriveTestRegional';
 import DriveTestTrend      from './pages/DriveTestTrend';
 import DriveTestBlackspots from './pages/DriveTestBlackspots';
-import DriveTestCorridor   from './pages/DriveTestCorridor';
-import DriveTestPci        from './pages/DriveTestPci';
+import DriveTestCluster    from './pages/DriveTestCluster';
+import DriveTestThroughput from './pages/DriveTestThroughput';
+import SignalThresholds from './pages/SignalThresholds';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
@@ -51,7 +52,6 @@ import ReportIssue from './pages/ReportIssue';
 import TrackComplaint from './pages/TrackComplaint';
 import PredictiveAnalytics from './pages/PredictiveAnalytics';
 import SpectrumManagement from './pages/SpectrumManagement';
-import FieldApp from './pages/FieldApp';
 import ReportTemplates from './pages/ReportTemplates';
 import SlaDashboard from './pages/SlaDashboard';
 import FiberDashboard from './pages/FiberDashboard';
@@ -83,7 +83,6 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/report" element={<ReportIssue />} />
       <Route path="/track" element={<TrackComplaint />} />
-      <Route path="/field" element={<FieldApp />} />
       <Route
         path="/"
         element={<Protected><Layout /></Protected>}
@@ -110,8 +109,9 @@ function AppRoutes() {
         <Route path="drive-test-regional" element={<DriveTestRegional />} />
         <Route path="drive-test-trend"      element={<DriveTestTrend />} />
         <Route path="drive-test-blackspots" element={<DriveTestBlackspots />} />
-        <Route path="drive-test-corridor"   element={<DriveTestCorridor />} />
-        <Route path="drive-test-pci"        element={<DriveTestPci />} />
+        <Route path="drive-test-cluster"   element={<DriveTestCluster />} />
+        <Route path="drive-test-throughput" element={<DriveTestThroughput />} />
+        <Route path="signal-thresholds" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><SignalThresholds /></RoleGuard>} />
         <Route path="drive-test-config" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN','DRIVE_TEST_USER']}><DriveTestConfig /></RoleGuard>} />
         <Route path="users" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']} permissions={['users:write']}><Users /></RoleGuard>} />
         <Route path="settings" element={<RoleGuard roles={['SYSTEM_ADMIN','REGULATOR_ADMIN']}><Settings /></RoleGuard>} />

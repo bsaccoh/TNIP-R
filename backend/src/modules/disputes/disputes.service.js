@@ -1,6 +1,6 @@
 import { query } from '../../config/db.js';
 
-async function ensureTable() {
+export async function ensureTable() {
   await query(`CREATE TABLE IF NOT EXISTS operator_disputes (
     dispute_id      INT AUTO_INCREMENT PRIMARY KEY,
     dispute_ref     VARCHAR(40)  NOT NULL UNIQUE,

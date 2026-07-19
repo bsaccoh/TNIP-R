@@ -1,7 +1,7 @@
 import { query } from '../../config/db.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-async function ensureTables() {
+export async function ensureTables() {
   // network_alarms may be populated by the API gateway push endpoint
   await query(`CREATE TABLE IF NOT EXISTS network_alarms (
     alarm_id      BIGINT AUTO_INCREMENT PRIMARY KEY,

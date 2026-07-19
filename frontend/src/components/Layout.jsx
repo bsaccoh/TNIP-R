@@ -60,6 +60,8 @@ import FactCheckIcon2 from '@mui/icons-material/RuleFolder';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import TimelineIcon    from '@mui/icons-material/Timeline';
 import LocationOffIcon from '@mui/icons-material/LocationOff';
+import LayersIcon      from '@mui/icons-material/Layers';
+import SpeedIcon       from '@mui/icons-material/Speed';
 import { useAuth } from '../auth/AuthContext';
 import { useColorMode } from '../theme/ColorMode';
 import { useSettings } from '../contexts/SettingsContext';
@@ -140,15 +142,15 @@ const NAV = [
     children: [
       { to: '/drive-test', label: 'Drive Tests', icon: <RouteIcon /> },
       { to: '/drive-test-campaigns', label: 'Campaigns', icon: <CampaignIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'REGULATOR_ANALYST', 'DRIVE_TEST_USER'] },
-      { to: '/field', label: 'Field App', icon: <PhoneAndroidIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
       { to: '/drive-test-analytics', label: 'DT Analytics', icon: <QueryStatsIcon /> },
       { to: '/drive-test-executive', label: 'DT Executive', icon: <AssessmentIcon /> },
       { to: '/drive-test-comparison', label: 'DT Comparison', icon: <CompareArrowsIcon /> },
       { to: '/drive-test-regional', label: 'DT Regional', icon: <MapIcon /> },
       { to: '/drive-test-trend',      label: 'DT Trend',      icon: <TimelineIcon />     },
       { to: '/drive-test-blackspots', label: 'Dead Zones',     icon: <LocationOffIcon />  },
-      { to: '/drive-test-corridor',   label: 'DT Corridor',   icon: <RouteIcon />        },
-      { to: '/drive-test-pci',        label: 'PCI Analysis',  icon: <WifiTetheringIcon />},
+      { to: '/drive-test-cluster',    label: 'Cluster Map',   icon: <LayersIcon />       },
+      { to: '/drive-test-throughput', label: 'Throughput',    icon: <SpeedIcon />        },
+      { to: '/signal-thresholds',  label: 'Signal Thresholds', icon: <TuneIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN'] },
       { to: '/drive-test-config', label: 'DT Config', icon: <SettingsIcon />, roles: ['SYSTEM_ADMIN', 'REGULATOR_ADMIN', 'DRIVE_TEST_USER'] },
     ],
   },

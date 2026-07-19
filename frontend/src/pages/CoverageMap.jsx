@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet.heat';
 import {
@@ -67,6 +67,7 @@ export default function CoverageMap() {
   const [tech, setTech] = useState('ALL');
   const [selectedOp, setSelectedOp] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('ALL');
   const [showCells, setShowCells] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [heatData, setHeatData] = useState(null);
@@ -88,7 +89,8 @@ export default function CoverageMap() {
   const loadCells = useCallback(() => {
     if (cells !== null) return;
     setCells('loading');
-    const params = selectedOp !== 'ALL' ? `?operatorId=${selectedOp}` : '';
+    let params = selectedOp !== 'ALL' ? `?operatorId=${selectedOp}` : '?';
+    if (status !== 'ALL') params += `&status=${status}`;
     get(`/inventory/map/cells${params}`).then((r) => setCells(r.data)).catch(() => setCells([]));
   }, [cells, selectedOp]);
 
@@ -98,7 +100,8 @@ export default function CoverageMap() {
 
   useEffect(() => {
     if (!showHeatmap || heatData) return;
-    const params = selectedOp !== 'ALL' ? `?operatorId=${selectedOp}` : '';
+    let params = selectedOp !== 'ALL' ? `?operatorId=${selectedOp}` : '?';
+    if (status !== 'ALL') params += `&status=${status}`;
     get(`/inventory/map/heat${params}`).then((r) => setHeatData(r.data || [])).catch(() => setHeatData([]));
   }, [showHeatmap, heatData, selectedOp]);
 
@@ -119,6 +122,7 @@ export default function CoverageMap() {
     let rows = sites.filter((s) => s.latitude && s.longitude);
     if (tech !== 'ALL') rows = rows.filter((s) => (s.technologies || '').includes(tech));
     if (selectedOp !== 'ALL') rows = rows.filter((s) => s.operator_id === Number(selectedOp));
+    if (status !== 'ALL') rows = rows.filter((s) => s.status === status);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter((s) =>
@@ -135,6 +139,7 @@ export default function CoverageMap() {
     let rows = cells.filter((c) => c.latitude && c.longitude);
     if (tech !== 'ALL') rows = rows.filter((c) => c.tech_key === tech);
     if (selectedOp !== 'ALL') rows = rows.filter((c) => c.operator_id === Number(selectedOp));
+    if (status !== 'ALL') rows = rows.filter((c) => c.status === status);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter((c) =>
@@ -177,6 +182,15 @@ export default function CoverageMap() {
 
   const mapKey = `${tileVariant}-${colorBy}`;
 
+  const getRadius = (techStr) => {
+    if (!techStr) return 1000;
+    if (techStr.includes('2G')) return 3000;
+    if (techStr.includes('3G')) return 2000;
+    if (techStr.includes('4G')) return 1000;
+    if (techStr.includes('5G')) return 500;
+    return 1000;
+  };
+
   return (
     <Box sx={{ display: 'flex', gap: 2, height: 'calc(100vh - 130px)' }}>
       {/* Sidebar */}
@@ -213,6 +227,19 @@ export default function CoverageMap() {
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
+
+          {/* Status filter */}
+          <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+            <InputLabel>Status</InputLabel>
+            <Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setCells(null); setHeatData(null); }}>
+              <MenuItem value="ALL">All Statuses</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="INACTIVE">Inactive</MenuItem>
+              <MenuItem value="PLANNED">Planned</MenuItem>
+              <MenuItem value="DEGRADED">Degraded</MenuItem>
+              <MenuItem value="DOWN">Down</MenuItem>
+            </Select>
+          </FormControl>
 
           {/* Color by */}
           <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
@@ -409,10 +436,10 @@ export default function CoverageMap() {
                 {filtered.map((s) => {
                   const c = markerColor(s);
                   return (
-                    <CircleMarker key={`s-${s.site_id}`}
+                    <Circle key={`s-${s.site_id}`}
                       center={[Number(s.latitude), Number(s.longitude)]}
-                      radius={6}
-                      pathOptions={{ color: c, fillColor: c, fillOpacity: 0.85, weight: 1.5 }}
+                      radius={getRadius(s.technologies)}
+                      pathOptions={{ color: c, fillColor: c, fillOpacity: 0.3, weight: 1.5 }}
                     >
                       <Popup>
                         <div style={{ minWidth: 190 }}>
@@ -444,7 +471,7 @@ export default function CoverageMap() {
                           </div>
                         </div>
                       </Popup>
-                    </CircleMarker>
+                    </Circle>
                   );
                 })}
               </MarkerClusterGroup>

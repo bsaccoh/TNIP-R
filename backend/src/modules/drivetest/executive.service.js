@@ -2,17 +2,27 @@ import { query } from '../../config/db.js';
 import { loadConfig } from './scoring.service.js';
 
 export async function getOperatorExecutiveSummary(operatorIdStr) {
-  const operatorId = Number(operatorIdStr) || 1;
+  const isAll = operatorIdStr === 'all';
+  const operatorId = isAll ? null : (Number(operatorIdStr) || 1);
   const c = await loadConfig();
-  const [operator] = await query('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
-  const operatorName = operator?.operator_name || 'Unknown';
+
+  let operatorName = 'All Operators';
+  if (!isAll) {
+    const [operator] = await query('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
+    operatorName = operator?.operator_name || 'Unknown';
+  }
+
+  const opFilter = isAll ? '' : 'AND operator_id = ?';
+  const opArgs  = isAll ? [] : [operatorId];
 
   const [overview] = await query(
     `SELECT COUNT(*) AS totalTests,
             COALESCE(SUM(total_samples), 0) AS totalSamples,
             ROUND(COALESCE(SUM(distance_km), 0), 1) AS totalDistance,
             ROUND(AVG(overall_score), 1) AS avgScore
-     FROM drive_tests WHERE operator_id = ? AND status = 'COMPLETED'`, [operatorId]);
+     FROM drive_tests WHERE status = 'COMPLETED' ${opFilter}`, opArgs);
+
+  const opJoinFilter = isAll ? '' : 'AND dt.operator_id = ?';
 
   const [kpi] = await query(
     `SELECT ROUND(AVG(rsrp), 1) AS avgRsrp, ROUND(MIN(rsrp), 1) AS minRsrp, ROUND(MAX(rsrp), 1) AS maxRsrp,
@@ -33,14 +43,14 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
             SUM(CASE WHEN event_type = 'HANDOVER' THEN 1 ELSE 0 END) AS handovers
      FROM drive_test_samples s
      JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id
-     WHERE dt.operator_id = ? AND dt.status = 'COMPLETED'`,
+     WHERE dt.status = 'COMPLETED' ${opJoinFilter}`,
     [c.rsrp_excellent,
      c.rsrp_good, c.rsrp_excellent,
      c.rsrp_fair, c.rsrp_good,
      c.rsrp_poor, c.rsrp_fair,
      c.rsrp_poor,
      c.rsrp_threshold, c.sinr_threshold, c.dl_threshold,
-     operatorId]);
+     ...opArgs]);
 
   const total = kpi?.totalSamples || 1;
   const fmt = v => v != null ? Number(v) : 0;
@@ -65,7 +75,7 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
   const ulTargetMbps = c.ul_threshold / 1000;
 
   const routeScores = await query(
-    `SELECT overall_score FROM drive_tests WHERE operator_id = ? AND status = 'COMPLETED' AND overall_score IS NOT NULL`, [operatorId]);
+    `SELECT overall_score FROM drive_tests WHERE status = 'COMPLETED' AND overall_score IS NOT NULL ${opFilter}`, opArgs);
   const routePerf = { excellent: 0, good: 0, fair: 0, poor: 0, failed: 0 };
   for (const r of routeScores) {
     const s = Number(r.overall_score);
@@ -154,25 +164,29 @@ export async function getOperatorExecutiveSummary(operatorIdStr) {
 }
 
 async function countSinrRange(operatorId, min, max) {
+  const opFilter = operatorId != null ? 'AND dt.operator_id = ?' : '';
+  const opArgs   = operatorId != null ? [operatorId] : [];
   const [r] = await query(
     `SELECT COUNT(*) AS cnt FROM drive_test_samples s
      JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id
-     WHERE dt.operator_id = ? AND dt.status = 'COMPLETED' AND s.sinr >= ? AND s.sinr < ?`,
-    [operatorId, min, max]);
+     WHERE dt.status = 'COMPLETED' ${opFilter} AND s.sinr >= ? AND s.sinr < ?`,
+    [...opArgs, min, max]);
   return r?.cnt || 0;
 }
 
 async function getProblemAreas(operatorId, c) {
   const problemThreshold = Math.min(c.rsrp_threshold, c.rsrp_fair);
+  const opFilter = operatorId != null ? 'AND dt.operator_id = ?' : '';
+  const opArgs   = operatorId != null ? [operatorId] : [];
   const rows = await query(
     `SELECT ROUND(s.latitude, 3) AS lat, ROUND(s.longitude, 3) AS lon,
             COUNT(*) AS cnt, ROUND(AVG(s.rsrp), 1) AS avgRsrp, ROUND(AVG(s.sinr), 1) AS avgSinr
      FROM drive_test_samples s
      JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id
-     WHERE dt.operator_id = ? AND dt.status = 'COMPLETED' AND s.rsrp < ?
+     WHERE dt.status = 'COMPLETED' ${opFilter} AND s.rsrp < ?
      GROUP BY ROUND(s.latitude, 3), ROUND(s.longitude, 3)
      HAVING cnt >= 3
-     ORDER BY avgRsrp ASC LIMIT 10`, [operatorId, problemThreshold]);
+     ORDER BY avgRsrp ASC LIMIT 10`, [...opArgs, problemThreshold]);
 
   const results = [];
   for (const r of rows) {
@@ -195,6 +209,8 @@ async function getProblemAreas(operatorId, c) {
 }
 
 async function getGeographicSummary(operatorId) {
+  const opFilter = operatorId != null ? 'AND dt.operator_id = ?' : '';
+  const opArgs   = operatorId != null ? [operatorId] : [];
   const rows = await query(
     `SELECT r.name AS region, COUNT(DISTINCT dt.drive_test_id) AS tests,
             ROUND(AVG(dt.overall_score), 1) AS avgScore
@@ -202,16 +218,16 @@ async function getGeographicSummary(operatorId) {
      JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
      JOIN sites st ON ABS(st.latitude - s.latitude) < 0.05 AND ABS(st.longitude - s.longitude) < 0.05
      JOIN regions r ON r.region_id = st.region_id
-     WHERE dt.operator_id = ? AND dt.status = 'COMPLETED'
+     WHERE dt.status = 'COMPLETED' ${opFilter}
      GROUP BY r.region_id, r.name
-     ORDER BY avgScore ASC`, [operatorId]);
+     ORDER BY avgScore ASC`, opArgs);
 
   if (!rows.length) {
     const fallback = await query(
       `SELECT dt.test_name AS region, 1 AS tests, ROUND(dt.overall_score, 1) AS avgScore
        FROM drive_tests dt
-       WHERE dt.operator_id = ? AND dt.status = 'COMPLETED' AND dt.overall_score IS NOT NULL
-       ORDER BY dt.overall_score ASC LIMIT 10`, [operatorId]);
+       WHERE dt.status = 'COMPLETED' ${opFilter} AND dt.overall_score IS NOT NULL
+       ORDER BY dt.overall_score ASC LIMIT 10`, opArgs);
     return fallback.map(r => ({
       region: r.region,
       tests: r.tests,

@@ -74,25 +74,49 @@ function decompressCdf(raw) {
   return Buffer.from(zlib.inflateSync(payload));
 }
 
-// ── Param ID constants ──────────────────────────────────────────────────────
+// ── Dynamic PID discovery from declarations ──────────────────────────────────
 
-const PID = {
-  RSRP: 9990,
-  RSRQ: 9982,
-  SINR: 12238,
-  PCI: 10078,
-  BAND: 12390,
-  DL_EARFCN: 13134,
-  UL_EARFCN: 10190,
-  PDSCH_TP: 12214,
-  PUSCH_TP: 10782,
-  PDSCH_TOTAL: 14454,
-  PUSCH_TOTAL: 14448,
-  LATITUDE: 603,
-  LONGITUDE: 602,
-  SPEED: 600,
-  ALTITUDE: 601,
-};
+function discoverPids(idToName) {
+  const pids = {};
+  for (const [pidStr, name] of Object.entries(idToName)) {
+    const pid = +pidStr;
+    const n = name.toLowerCase();
+    // GPS
+    if (n === 'location.latitude')  { pids.LATITUDE  ??= pid; continue; }
+    if (n === 'location.longitude') { pids.LONGITUDE ??= pid; continue; }
+    if (n === 'location.speed')     { pids.SPEED     ??= pid; continue; }
+    if (n === 'location.altitude')  { pids.ALTITUDE  ??= pid; continue; }
+    // LTE
+    if (/radio\.lte\.servingcell\[\d+\]\.rsrp$/i.test(n))          { pids.RSRP       ??= pid; continue; }
+    if (/radio\.lte\.servingcell\[\d+\]\.rsrq$/i.test(n))          { pids.RSRQ       ??= pid; continue; }
+    if (/radio\.lte\.servingcell\[\d+\]\.pci$/i.test(n))           { pids.PCI        ??= pid; continue; }
+    if (/radio\.lte\.servingcell\[\d+\]\.pdsch\.sinr$/i.test(n))   { pids.SINR       ??= pid; continue; }
+    if (/radio\.lte\.servingcell\[\d+\]\.downlink\.earfcn$/i.test(n)) { pids.DL_EARFCN ??= pid; continue; }
+    if (/radio\.lte\.servingcelltotal\.pdsch\.throughput$/i.test(n))    { pids.PDSCH_TP    ??= pid; continue; }
+    if (/radio\.lte\.servingcelltotal\.mac\.downlink\.throughput$/i.test(n)) { pids.PDSCH_TOTAL ??= pid; continue; }
+    if (/radio\.lte\.servingcelltotal\.mac\.uplink\.throughput$/i.test(n))   { pids.PUSCH_TOTAL ??= pid; continue; }
+    // 2G GSM – use RxQualFull as signal quality proxy
+    if (n === 'radio.gsm.servingcell.rxqualfull') { pids.RXQUAL ??= pid; continue; }
+    if (n === 'radio.gsm.servingcell.rxlev')      { pids.RXLEV  ??= pid; continue; }
+    if (n === 'radio.gsm.servingcell.bsic')       { pids.BSIC   ??= pid; continue; }
+    if (n === 'radio.gsm.servingcell.bcch.arfcn') { pids.ARFCN  ??= pid; continue; }
+    if (n === 'radio.gsm.currentarfcn')           { pids.ARFCN  ??= pid; continue; }
+    // 3G WCDMA
+    if (/radio\.wcdma\.servingcarrier\[\d+\]\.cell\[\d+\]\.rscp$/i.test(n)) { pids.RSCP  ??= pid; continue; }
+    if (/radio\.wcdma\.servingcarrier\[\d+\]\.cell\[\d+\]\.ecno$/i.test(n)) { pids.ECNO  ??= pid; continue; }
+    if (/radio\.wcdma\.servingcarrier\[\d+\]\.uarfcn$/i.test(n))            { pids.UARFCN ??= pid; continue; }
+    // Ping / RTT / Jitter / Packet-loss (ITU-T Y.1540 / 3GPP TS 22.261)
+    if (/internet\.ping\.rtt$/i.test(n))           { pids.RTT         ??= pid; continue; }
+    if (/internet\.ping\.jitter$/i.test(n))         { pids.JITTER      ??= pid; continue; }
+    if (/internet\.ping\.packetloss$/i.test(n))     { pids.PACKET_LOSS ??= pid; continue; }
+    // Voice MOS (ITU-T P.800 / P.862)
+    if (/voice\.mos$/i.test(n) || /audio\.mos$/i.test(n)) { pids.MOS ??= pid; continue; }
+    // Call / event state (ITU-T E.800 CSSR / CDR)
+    if (/call\.status$/i.test(n))  { pids.CALL_STATUS ??= pid; continue; }
+    if (/event\.type$/i.test(n))   { pids.EVENT_TYPE  ??= pid; continue; }
+  }
+  return pids;
+}
 
 function extractValue(sub) {
   for (const entry of sub[10] ?? []) if (entry.t === 'f') return entry.v;
@@ -197,6 +221,51 @@ export async function previewTrpFile(buffer) {
     if (meaningful.length) testName = meaningful.join(' — ');
   }
 
+  // Extract GPS centroid from first provider's data
+  let gpsCenter = null;
+  try {
+    const providerDirs = [];
+    zip.forEach((path) => { const m = path.match(/^trp\/providers\/(sp\d+)\/$/); if (m) providerDirs.push(m[1]); });
+    if (!providerDirs.length) providerDirs.push('sp1');
+    const sp = providerDirs[0];
+    const declFile = zip.file(`trp/providers/${sp}/cdf/declarations.cdf`);
+    const dataFile = zip.file(`trp/providers/${sp}/cdf/data.cdf`);
+    if (declFile && dataFile) {
+      const declBuf = decompressCdf(Buffer.from(await declFile.async('arraybuffer')));
+      const dataBuf = decompressCdf(Buffer.from(await dataFile.async('arraybuffer')));
+      const idToName = {};
+      for (const rec of iterRecords(declBuf)) {
+        const pid = rec[2]?.[0]?.v;
+        const nameEntry = rec[1]?.[0];
+        if (pid != null && nameEntry?.t === 'b') idToName[pid] = nameEntry.v.toString('utf-8');
+      }
+      const PID = discoverPids(idToName);
+      const latPoints = [], lonPoints = [];
+      let currentValues = {};
+      outer: for (const rec of iterRecords(dataBuf)) {
+        for (const dp of rec[3] ?? []) {
+          if (dp.t !== 'b') continue;
+          const sub = parsePb(dp.v);
+          const pid = sub[1]?.[0]?.v;
+          if (pid == null) continue;
+          const val = extractValue(sub);
+          if (val != null) currentValues[pid] = val;
+        }
+        const lat = PID.LATITUDE != null ? (currentValues[PID.LATITUDE] ?? null) : null;
+        const lon = PID.LONGITUDE != null ? (currentValues[PID.LONGITUDE] ?? null) : null;
+        if (lat != null && lon != null && lat !== 0 && lon !== 0) {
+          latPoints.push(Number(lat)); lonPoints.push(Number(lon));
+          if (latPoints.length >= 20) break outer;
+        }
+      }
+      if (latPoints.length) {
+        const avgLat = latPoints.reduce((a, b) => a + b, 0) / latPoints.length;
+        const avgLon = lonPoints.reduce((a, b) => a + b, 0) / lonPoints.length;
+        gpsCenter = { lat: +avgLat.toFixed(6), lng: +avgLon.toFixed(6) };
+      }
+    }
+  } catch { /* GPS extraction is best-effort */ }
+
   return {
     operator: meta.operator || null,
     device: meta.device || null,
@@ -206,6 +275,7 @@ export async function previewTrpFile(buffer) {
     testName,
     appVersion: meta.appVersion || null,
     imei: meta.imei || null,
+    gpsCenter,
   };
 }
 
@@ -236,37 +306,54 @@ export async function parseTrpFile(buffer) {
     const declBuf = decompressCdf(declRaw);
     const dataBuf = decompressCdf(dataRaw);
 
-    const paramNames = {};
+    const idToName = {};
     for (const rec of iterRecords(declBuf)) {
       const pid = rec[2]?.[0]?.v;
-      const name = rec[1]?.[0]?.v;
-      if (pid != null && name) {
-        paramNames[pid] = Buffer.isBuffer(name) ? name.toString('utf-8') : String(name);
+      const nameEntry = rec[1]?.[0];
+      if (pid != null && nameEntry?.t === 'b') {
+        idToName[pid] = nameEntry.v.toString('utf-8');
       }
     }
+    const PID = discoverPids(idToName);
 
     let currentTs = null;
     let currentValues = {};
+    let stickyLat = null;
+    let stickyLon = null;
+
+    const cv = (key) => (PID[key] != null ? (currentValues[PID[key]] ?? null) : null);
 
     const flush = () => {
       if (!currentTs) return;
-      const lat = currentValues[PID.LATITUDE];
-      const lon = currentValues[PID.LONGITUDE];
-      if (lat != null && lon != null && lat !== 0 && lon !== 0) {
+      const rawLat = cv('LATITUDE');
+      const rawLon = cv('LONGITUDE');
+      if (rawLat != null && rawLat !== 0) stickyLat = rawLat;
+      if (rawLon != null && rawLon !== 0) stickyLon = rawLon;
+      const lat = stickyLat;
+      const lon = stickyLon;
+      if (lat != null && lon != null) {
+        // Pick best signal value across LTE / 3G / 2G
+        const rsrp = cv('RSRP') ?? cv('RSCP') ?? cv('RXLEV');
+        const rsrq = cv('RSRQ') ?? cv('ECNO') ?? cv('RXQUAL');
+        const pci  = cv('PCI')  ?? cv('BSIC');
+        const earfcn = cv('DL_EARFCN') ?? cv('UARFCN') ?? cv('ARFCN');
+        const dl = cv('PDSCH_TOTAL') ?? cv('PDSCH_TP');
         allSamples.push({
           ts: new Date(currentTs * 1000),
           latitude: lat,
           longitude: lon,
-          rsrp: currentValues[PID.RSRP] ?? null,
-          rsrq: currentValues[PID.RSRQ] ?? null,
-          sinr: currentValues[PID.SINR] ?? null,
-          pci: currentValues[PID.PCI] ?? null,
-          band: currentValues[PID.BAND] != null ? String(currentValues[PID.BAND]) : null,
-          earfcn: currentValues[PID.DL_EARFCN] ?? null,
-          dl_throughput: currentValues[PID.PDSCH_TOTAL] ?? currentValues[PID.PDSCH_TP] ?? null,
-          ul_throughput: currentValues[PID.PUSCH_TOTAL] ?? currentValues[PID.PUSCH_TP] ?? null,
-          speed: currentValues[PID.SPEED] ?? null,
-          altitude: currentValues[PID.ALTITUDE] ?? null,
+          rsrp, rsrq,
+          sinr:            cv('SINR'),
+          pci, earfcn, dl_throughput: dl,
+          ul_throughput:   cv('PUSCH_TOTAL'),
+          speed:           cv('SPEED'),
+          altitude:        cv('ALTITUDE'),
+          rtt_ms:          cv('RTT'),
+          jitter_ms:       cv('JITTER'),
+          packet_loss_pct: cv('PACKET_LOSS'),
+          mos:             cv('MOS'),
+          call_status:     cv('CALL_STATUS') != null ? String(cv('CALL_STATUS')) : null,
+          event_type:      cv('EVENT_TYPE')  != null ? String(cv('EVENT_TYPE'))  : null,
         });
       }
     };

@@ -809,10 +809,10 @@ function DriveTestSection({ filter, tip, opColor }) {
                       <TableCell align="right">Tests</TableCell>
                       <TableCell align="right">Samples</TableCell>
                       <TableCell align="right">Distance</TableCell>
-                      <TableCell align="right">Avg RSRP</TableCell>
-                      <TableCell align="right">Avg SINR</TableCell>
+                      <TableCell align="right">Avg Signal</TableCell>
+                      <TableCell align="right">Avg SINR/Ec/No</TableCell>
                       <TableCell align="right">Avg DL</TableCell>
-                      <TableCell align="right">RSRP Compliance</TableCell>
+                      <TableCell align="right">Signal Compliance</TableCell>
                       <TableCell align="right">Call Drops</TableCell>
                     </TableRow>
                   </TableHead>

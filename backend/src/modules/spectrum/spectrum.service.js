@@ -1,7 +1,7 @@
 import { query } from '../../config/db.js';
 
 /* ── Table bootstrap ─────────────────────────────────────────────────────── */
-async function ensureTables() {
+export async function ensureTables() {
   await query(`
     CREATE TABLE IF NOT EXISTS spectrum_assignments (
       assignment_id   INT AUTO_INCREMENT PRIMARY KEY,

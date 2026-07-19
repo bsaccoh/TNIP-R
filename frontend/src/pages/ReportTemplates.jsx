@@ -14,8 +14,10 @@ import PrintIcon from '@mui/icons-material/Print';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
-import { api } from '../api/client';
+import LayersIcon from '@mui/icons-material/Layers';
+import { api, get } from '../api/client';
 import PageHeader from '../components/PageHeader';
+import { generateFullReport, buildTechCfg, clusterFromName, geoCluster } from './DriveTestCluster';
 
 /* ── Icon map ────────────────────────────────────────────────────────────── */
 const ICONS = {
@@ -36,10 +38,9 @@ const CATEGORY_COLOR = {
 
 /* ── Print engine ────────────────────────────────────────────────────────── */
 function printReport(template, data, config) {
-  const w = window.open('', '_blank', 'width=1000,height=800');
+  const w = window.open('', '_blank');
   w.document.write(buildHtml(template, data, config));
   w.document.close();
-  w.onload = () => w.print();
 }
 
 function fmt(v, decimals = 1) {
@@ -50,33 +51,41 @@ function fmt(v, decimals = 1) {
 function pctBar(pct, color = '#1565c0') {
   const safe = Math.min(100, Math.max(0, Number(pct) || 0));
   const bg   = safe >= 80 ? '#2e7d32' : safe >= 60 ? '#e65100' : '#c62828';
-  return `<div style="display:flex;align-items:center;gap:6px">
-    <div style="flex:1;height:7px;background:#e0e0e0;border-radius:4px;overflow:hidden">
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <div style="flex:1;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.1)">
       <div style="width:${safe}%;height:100%;background:${bg};border-radius:4px"></div>
     </div>
-    <span style="font-size:11px;font-weight:700;color:${bg};min-width:36px;text-align:right">${safe.toFixed(1)}%</span>
+    <span style="font-size:12px;font-weight:700;color:${bg};min-width:36px;text-align:right">${safe.toFixed(1)}%</span>
   </div>`;
 }
 
 function table(headers, rows, cellStyle = '') {
-  return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
-    <thead><tr>${headers.map((h) => `<th style="padding:6px 10px;background:#1565c0;color:#fff;text-align:left;font-weight:600">${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f5f5f5'}">${r.map((c) => `<td style="padding:6px 10px;border-bottom:1px solid #e0e0e0;${cellStyle}">${c ?? '—'}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table>`;
+  return `<div style="overflow-x:auto;margin-bottom:20px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e0e0e0">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">
+      <thead>
+        <tr>${headers.map((h) => `<th style="padding:10px 12px;background:#1565c0;color:#fff;text-align:left;font-weight:600;font-size:13px">${h}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f8f9fa'}">
+          ${r.map((c) => `<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;color:#333;${cellStyle}">${c ?? '—'}</td>`).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
 }
 
 function section(title, content) {
-  return `<div style="margin-bottom:28px">
-    <h3 style="margin:0 0 10px;font-size:14px;color:#1565c0;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #1565c0;padding-bottom:4px">${title}</h3>
+  return `<div style="margin-bottom:32px;page-break-inside:avoid;">
+    <h3 style="margin:0 0 16px;font-size:15px;color:#1565c0;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #1565c0;padding-bottom:6px">${title}</h3>
     ${content}
   </div>`;
 }
 
 function kv(items) {
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-    ${items.map(([l, v]) => `<div style="background:#f5f5f5;border-radius:6px;padding:10px">
-      <div style="font-size:11px;color:#757575;margin-bottom:2px">${l}</div>
-      <div style="font-size:18px;font-weight:700;color:#1565c0">${v ?? '—'}</div>
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:16px;margin-bottom:24px">
+    ${items.map(([l, v, c]) => `<div style="background:#f8f9fa;border-radius:8px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,0.05);border:1px solid #eee">
+      <div style="font-size:12px;color:#757575;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${l}</div>
+      <div style="font-size:22px;font-weight:700;color:${c || '#1565c0'}">${v ?? '—'}</div>
     </div>`).join('')}
   </div>`;
 }
@@ -85,6 +94,12 @@ function buildHtml(template, data, config) {
   const now   = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const range = `${config.from} to ${config.to}`;
   let body    = '';
+  let scripts = [];
+
+  const chartBlock = (id, type, chartData, options = {}) => {
+    scripts.push(`new Chart(document.getElementById('${id}'), { type: '${type}', data: ${JSON.stringify(chartData)}, options: Object.assign({ responsive: true, maintainAspectRatio: false }, ${JSON.stringify(options)}) });`);
+    return `<div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #e0e0e0;box-shadow:0 2px 4px rgba(0,0,0,0.05);height:300px;margin-bottom:20px"><canvas id="${id}"></canvas></div>`;
+  };
 
   if (template.id === 'monthly-qos') {
     body += section('Executive Summary', kv([
@@ -92,6 +107,24 @@ function buildHtml(template, data, config) {
       ['Total Measurements', String(data.totalMeasurements)],
       ['Threshold Violations', String(data.violations?.length ?? 0)],
     ]));
+
+    const opMap = {};
+    (data.kpiRows || []).forEach((r) => {
+      if (!opMap[r.operator_name]) opMap[r.operator_name] = [];
+      opMap[r.operator_name].push(r);
+    });
+
+    const opLabels = Object.keys(opMap);
+    if (opLabels.length > 0) {
+      const avgData = opLabels.map(op => {
+        const rows = opMap[op];
+        return (rows.reduce((sum, r) => sum + (Number(r.compliance_pct) || 0), 0) / Math.max(1, rows.length)).toFixed(1);
+      });
+      body += section('Operator Compliance Comparison', chartBlock('qosChart', 'bar', {
+        labels: opLabels,
+        datasets: [{ label: 'Avg Compliance %', data: avgData, backgroundColor: '#1565c0' }]
+      }, { scales: { y: { beginAtZero: true, max: 100 } } }));
+    }
 
     if (data.violations?.length) {
       body += section('Threshold Violations', table(
@@ -104,12 +137,6 @@ function buildHtml(template, data, config) {
       ));
     }
 
-    // Group by operator
-    const opMap = {};
-    (data.kpiRows || []).forEach((r) => {
-      if (!opMap[r.operator_name]) opMap[r.operator_name] = [];
-      opMap[r.operator_name].push(r);
-    });
     for (const [op, rows] of Object.entries(opMap)) {
       body += section(`Operator Scorecard — ${op}`, table(
         ['KPI', 'Tech', 'Avg', 'Min', 'Max', 'Compliance'],
@@ -125,13 +152,21 @@ function buildHtml(template, data, config) {
   }
 
   if (template.id === 'quarterly-spectrum') {
+    const active = data.assignments?.filter((a) => a.status === 'ACTIVE').length ?? 0;
+    const expiring = data.expiring?.length ?? 0;
+    
     body += section('Spectrum Overview', kv([
       ['Total Assignments', String(data.assignments?.length ?? 0)],
-      ['Active',           String(data.assignments?.filter((a) => a.status === 'ACTIVE').length ?? 0)],
+      ['Active',           String(active)],
       ['Interference Cases', String(data.interference?.length ?? 0)],
-      ['Expiring (180d)',  String(data.expiring?.length ?? 0)],
+      ['Expiring (180d)',  String(expiring)],
       ['Bands',            String(data.bands?.length ?? 0)],
     ]));
+
+    body += section('Assignment Status', chartBlock('spectrumChart', 'doughnut', {
+      labels: ['Active', 'Expiring (180d)', 'Other'],
+      datasets: [{ data: [active, expiring, Math.max(0, (data.assignments?.length||0) - active - expiring)], backgroundColor: ['#2e7d32', '#e65100', '#9e9e9e'] }]
+    }, { maintainAspectRatio: false }));
 
     body += section('Band Summary', table(
       ['Band', 'Freq Range (MHz)', 'Operators', 'Total BW (MHz)', 'Technologies'],
@@ -180,12 +215,17 @@ function buildHtml(template, data, config) {
     const ps = data.penSummary || {};
     body += section('Overview', kv([
       ['Total Obligations',   String(os.total ?? 0)],
-      ['Compliant',           String(os.compliant ?? 0)],
-      ['Breached',            String(os.breached ?? 0)],
-      ['At Risk',             String(os.atRisk ?? 0)],
+      ['Compliant',           String(os.compliant ?? 0), '#2e7d32'],
+      ['Breached',            String(os.breached ?? 0), '#c62828'],
+      ['At Risk',             String(os.atRisk ?? 0), '#e65100'],
       ['Penalties Issued',    String(ps.total ?? 0)],
-      ['Total Fines (SLL)',   Number(ps.totalAmount || 0).toLocaleString()],
+      ['Total Fines (SLL)',   Number(ps.totalAmount || 0).toLocaleString(), '#b71c1c'],
     ]));
+
+    body += section('Obligation Status', chartBlock('oblChart', 'pie', {
+      labels: ['Compliant', 'Breached', 'At Risk'],
+      datasets: [{ data: [os.compliant ?? 0, os.breached ?? 0, os.atRisk ?? 0], backgroundColor: ['#2e7d32', '#c62828', '#e65100'] }]
+    }, { maintainAspectRatio: false }));
 
     body += section('License Obligations', table(
       ['Operator', 'Title', 'Type', 'Status', 'Due Date', 'Progress'],
@@ -221,22 +261,24 @@ function buildHtml(template, data, config) {
   if (template.id === 'consumer-qoe') {
     body += section('QoE Summary', kv([
       ['Total Complaints', String(data.total ?? 0)],
-      ['Resolved',         String(data.resolved ?? 0)],
-      ['Serious (High/Critical)', String(data.serious ?? 0)],
-      ['Resolution Rate',  data.total > 0 ? `${((data.resolved / data.total) * 100).toFixed(1)}%` : '—'],
+      ['Resolved',         String(data.resolved ?? 0), '#2e7d32'],
+      ['Serious',          String(data.serious ?? 0), '#c62828'],
+      ['Resolution Rate',  data.total > 0 ? `${((data.resolved / data.total) * 100).toFixed(1)}%` : '—', '#1565c0'],
     ]));
+
+    const issueLabels = (data.byIssueType || []).map(r => r.issue_type?.replace(/_/g, ' '));
+    const issueData = (data.byIssueType || []).map(r => r.total);
+    if (issueLabels.length > 0) {
+      body += section('Complaints by Issue Type', chartBlock('qoeChart', 'bar', {
+        labels: issueLabels,
+        datasets: [{ label: 'Total Complaints', data: issueData, backgroundColor: '#4a148c' }]
+      }));
+    }
 
     body += section('Complaints by Operator', table(
       ['Operator', 'Total', 'Serious', 'Resolved', 'Pending'],
       (data.byOperator || []).map((r) => [
         r.operator_name || 'Unknown', r.total, r.serious, r.resolved, r.new_count,
-      ]),
-    ));
-
-    body += section('Complaints by Issue Type', table(
-      ['Issue Type', 'Total', 'Serious'],
-      (data.byIssueType || []).map((r) => [
-        r.issue_type?.replace(/_/g, ' '), r.total, r.serious,
       ]),
     ));
 
@@ -272,36 +314,56 @@ function buildHtml(template, data, config) {
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>${template.title}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #212121; margin: 0; background: #fff; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #212121; margin: 0; background: #f0f2f5; }
   @media print {
-    body { margin: 0; }
+    body { background: #fff; margin: 0; }
     .no-print { display: none; }
-    @page { margin: 20mm; size: A4; }
+    .page-container { box-shadow: none !important; margin: 0 !important; padding: 10mm !important; }
+    @page { margin: 15mm; size: A4; }
   }
+  .page-container {
+    max-width: 900px;
+    margin: 32px auto;
+    padding: 40px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-radius: 8px;
+  }
+  .cover-bar { background: #1565c0; color: #fff; padding: 24px 32px; border-radius: 8px 8px 0 0; margin: -40px -40px 32px -40px; display: flex; justify-content: space-between; align-items: center; }
 </style>
 </head><body>
-<div style="max-width:900px;margin:0 auto;padding:32px 24px">
+<div class="page-container">
+  <button class="no-print" onclick="window.print()" style="margin-bottom:24px;padding:10px 24px;background:#1565c0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.15)">
+    🖨 Print / Export PDF
+  </button>
   <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565c0;padding-bottom:16px;margin-bottom:28px">
+  <div class="cover-bar">
     <div>
-      <div style="font-size:11px;color:#757575;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">National Telecommunications Commission — Sierra Leone</div>
-      <h1 style="margin:0;font-size:22px;color:#1565c0">${template.title}</h1>
-      <div style="font-size:12px;color:#757575;margin-top:6px">Reporting period: <strong>${range}</strong></div>
+      <div style="font-size:12px;opacity:0.85;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">NATCOM Sierra Leone</div>
+      <h1 style="margin:0;font-size:26px;">${template.title}</h1>
+      <div style="font-size:13px;opacity:0.9;margin-top:8px">Reporting period: <strong>${range}</strong></div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:11px;color:#757575">Generated</div>
-      <div style="font-size:12px;font-weight:600">${now}</div>
-      <div style="font-size:11px;color:#9e9e9e;margin-top:4px">TNIP-R Regulatory Platform</div>
+      <div style="font-size:12px;opacity:0.85">Generated</div>
+      <div style="font-size:14px;font-weight:700">${now}</div>
+      <div style="font-size:11px;opacity:0.7;margin-top:4px">TNIP-R Platform</div>
     </div>
   </div>
   ${body}
-  <div style="border-top:1px solid #e0e0e0;padding-top:12px;margin-top:32px;font-size:10px;color:#9e9e9e;display:flex;justify-content:space-between">
+  <div style="border-top:1px solid #e0e0e0;padding-top:16px;margin-top:40px;font-size:11px;color:#9e9e9e;display:flex;justify-content:space-between">
     <span>NATCOM Sierra Leone — CONFIDENTIAL</span>
-    <span>Generated by TNIP-R · ${now}</span>
+    <span>Generated by TNIP-R Platform · ${now}</span>
   </div>
 </div>
+<script>
+  window.onload = function() {
+    ${scripts.join('\n    ')}
+    setTimeout(function() { window.print(); }, 600);
+  };
+</script>
 </body></html>`;
 }
 
@@ -659,6 +721,168 @@ function DataPreview({ template, data }) {
   return <Alert severity="info">Select a date range and click Refresh to preview data.</Alert>;
 }
 
+/* ── Cluster Map Report Panel ────────────────────────────────────────────── */
+function ClusterReportPanel({ onClose }) {
+  const [allTests, setAllTests]       = useState(null);
+  const [thresholdCfg, setThreshold]  = useState(null);
+  const [selectedCluster, setCluster] = useState('');
+  const [generating, setGenerating]   = useState(false);
+  const [error, setError]             = useState('');
+
+  useEffect(() => {
+    get('/drive-tests')
+      .then((r) => setAllTests(r.data || []))
+      .catch(() => setAllTests([]));
+    get('/drive-tests/signal-thresholds')
+      .then((r) => setThreshold(buildTechCfg(r.data || [])))
+      .catch(() => setThreshold(buildTechCfg([])));
+  }, []);
+
+  // Derive unique geographic clusters (strip operator prefix)
+  const geoClusters = allTests
+    ? [...new Set(
+        allTests
+          .map((t) => geoCluster(clusterFromName(t.test_name)))
+          .filter(Boolean)
+      )].sort()
+    : [];
+
+  const techs = selectedCluster && allTests
+    ? [...new Set(
+        allTests
+          .filter((t) => geoCluster(clusterFromName(t.test_name)) === selectedCluster)
+          .map((t) => t.technology)
+          .filter(Boolean)
+      )].sort()
+    : [];
+
+  const totalTests = selectedCluster && allTests
+    ? allTests.filter((t) => geoCluster(clusterFromName(t.test_name)) === selectedCluster).length
+    : 0;
+
+  const handleGenerate = async (download = false) => {
+    if (!selectedCluster) { setError('Please select a cluster first.'); return; }
+    setError('');
+    setGenerating(true);
+    try {
+      // generateFullReport expects a raw cluster name (e.g. "Africell_Bo_CL01") and applies
+      // geoCluster() internally. Find any matching full cluster name to avoid double-stripping.
+      const fullCluster = allTests
+        .map((t) => clusterFromName(t.test_name))
+        .find((c) => c && geoCluster(c) === selectedCluster) || selectedCluster;
+      await generateFullReport(fullCluster, allTests, thresholdCfg, { download });
+    } catch (e) {
+      setError(`Failed to generate report: ${e.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const loading = allTests === null;
+
+  return (
+    <Drawer anchor="right" open onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100%', md: 520 }, display: 'flex', flexDirection: 'column' } }}>
+      {/* Header */}
+      <Box sx={{ p: 2.5, flexShrink: 0, borderBottom: 1, borderColor: 'divider', borderLeft: '3px solid #e65100' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="overline" color="text.secondary">Drive Test</Typography>
+            <Typography variant="h6" sx={{ lineHeight: 1.2 }}>Cluster Map Coverage Report</Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          Full signal coverage report with Leaflet maps, distribution tables, problem areas, dead zone analysis and remarks — for all operators in the selected cluster.
+        </Typography>
+      </Box>
+
+      {/* Cluster selector */}
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={18} /> <Typography variant="caption">Loading clusters…</Typography>
+          </Box>
+        ) : (
+          <FormControl size="small" fullWidth>
+            <InputLabel>Geographic Cluster</InputLabel>
+            <Select value={selectedCluster} label="Geographic Cluster" onChange={(e) => setCluster(e.target.value)}>
+              <MenuItem value=""><em>— select cluster —</em></MenuItem>
+              {geoClusters.map((c) => (
+                <MenuItem key={c} value={c}>{c}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
+        {selectedCluster && (
+          <Box sx={{ mt: 1.5 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              {techs.map((t) => (
+                <Chip key={t} label={t} size="small"
+                  sx={{ bgcolor: t === '3G' ? '#1565c0' : t === '4G' ? '#2e7d32' : '#6a1b9a', color: '#fff', fontSize: '0.65rem' }} />
+              ))}
+              <Chip label={`${totalTests} drive test files`} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />
+            </Stack>
+          </Box>
+        )}
+      </Box>
+
+      {/* What's included */}
+      <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+          Report sections
+        </Typography>
+        <Stack spacing={0.75}>
+          {[
+            'Cover page with district, region & country details',
+            'Signal Classification legend (per technology)',
+            'Side-by-side Leaflet maps — primary & secondary metric',
+            'Signal distribution tables with compliance %',
+            'Top 10 problem areas per operator',
+            'Remarks — status, compliance narrative & recommendations',
+            'Dead Zone Analysis map (Critical / Severe / Poor)',
+            'Dead Zone remarks with tech-specific root-cause notes',
+          ].map((s) => (
+            <Stack key={s} direction="row" spacing={1} alignItems="flex-start">
+              <Box sx={{ mt: '2px', width: 6, height: 6, borderRadius: '50%', bgcolor: '#e65100', flexShrink: 0 }} />
+              <Typography variant="caption">{s}</Typography>
+            </Stack>
+          ))}
+        </Stack>
+
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+
+        {!selectedCluster && !loading && geoClusters.length === 0 && (
+          <Alert severity="info" sx={{ mt: 2 }}>No drive test clusters found. Upload TRP files to generate clusters.</Alert>
+        )}
+      </Box>
+
+      {/* Actions */}
+      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
+        <Stack spacing={1}>
+          <Button fullWidth variant="contained"
+            startIcon={generating ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+            disabled={!selectedCluster || generating || loading}
+            onClick={handleGenerate}
+            sx={{ bgcolor: '#e65100', '&:hover': { bgcolor: '#bf360c' } }}>
+            {generating ? 'Generating…' : 'Open in New Tab'}
+          </Button>
+          <Button fullWidth variant="outlined"
+            startIcon={generating ? <CircularProgress size={16} /> : <DownloadIcon />}
+            disabled={!selectedCluster || generating || loading}
+            onClick={() => handleGenerate(true)}>
+            {generating ? 'Generating…' : 'Download as HTML'}
+          </Button>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+          HTML file includes interactive Leaflet maps · open in any browser to print
+        </Typography>
+      </Box>
+    </Drawer>
+  );
+}
+
 /* ── Template card ───────────────────────────────────────────────────────── */
 function TemplateCard({ template, onSelect }) {
   const color = CATEGORY_COLOR[template.category] || '#1565c0';
@@ -697,10 +921,11 @@ function TemplateCard({ template, onSelect }) {
 
 /* ── Main page ───────────────────────────────────────────────────────────── */
 export default function ReportTemplates() {
-  const [templates, setTemplates] = useState([]);
-  const [operators, setOperators] = useState([]);
-  const [selected, setSelected]   = useState(null);
-  const [catFilter, setCatFilter] = useState('All');
+  const [templates, setTemplates]       = useState([]);
+  const [operators, setOperators]       = useState([]);
+  const [selected, setSelected]         = useState(null);
+  const [catFilter, setCatFilter]       = useState('All');
+  const [clusterPanel, setClusterPanel] = useState(false);
 
   useEffect(() => {
     api.get('/reports/templates').then((r) => setTemplates(r.data.data || [])).catch(() => {});
@@ -729,6 +954,44 @@ export default function ReportTemplates() {
       </Stack>
 
       <Grid container spacing={2.5}>
+        {/* Cluster Map Coverage Report — always shown first in Drive Test category */}
+        {(catFilter === 'All' || catFilter === 'Drive Test') && (
+          <Grid item xs={12} sm={6} md={4}>
+            <Paper elevation={2} onClick={() => setClusterPanel(true)} sx={{
+              p: 2.5, cursor: 'pointer', height: '100%',
+              borderTop: '4px solid #e65100',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+              '&:hover': { transform: 'translateY(-2px)', boxShadow: 6 },
+            }}>
+              <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ mb: 1.5 }}>
+                <Box sx={{ color: '#e65100', flexShrink: 0 }}><LayersIcon sx={{ fontSize: 32 }} /></Box>
+                <Box>
+                  <Chip label="Drive Test" size="small"
+                    sx={{ bgcolor: '#e65100', color: '#fff', fontSize: '0.62rem', height: 18, mb: 0.5 }} />
+                  <Typography variant="body1" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                    Cluster Map Coverage Report
+                  </Typography>
+                </Box>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', mb: 1.5 }}>
+                Full drive test signal coverage report with Leaflet maps, distribution tables, problem areas,
+                dead zone analysis and auto-generated remarks — all operators in one report.
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                {['Coverage Maps', 'Signal Distribution', 'Problem Areas', 'Dead Zones', 'Remarks', 'All Operators'].map((s) => (
+                  <Chip key={s} label={s} size="small" variant="outlined"
+                    sx={{ fontSize: '0.6rem', height: 18, mb: 0.25 }} />
+                ))}
+              </Stack>
+              <Button size="small" variant="contained" fullWidth sx={{ mt: 2, bgcolor: '#e65100', '&:hover': { bgcolor: '#bf360c' } }}
+                startIcon={<PrintIcon />} onClick={() => setClusterPanel(true)}>
+                Configure & Generate
+              </Button>
+            </Paper>
+          </Grid>
+        )}
+
         {visible.map((t) => (
           <Grid item xs={12} sm={6} md={4} key={t.id}>
             <TemplateCard template={t} onSelect={() => setSelected(t)} />
@@ -743,6 +1006,8 @@ export default function ReportTemplates() {
           operators={operators}
         />
       )}
+
+      {clusterPanel && <ClusterReportPanel onClose={() => setClusterPanel(false)} />}
     </Box>
   );
 }

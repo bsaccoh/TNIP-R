@@ -4,11 +4,93 @@ import * as xlsx from 'xlsx';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import https from 'node:https';
 import { parseTrpFile } from './trp-parser.js';
 export { getOperatorExecutiveSummary, getOperatorComparisonDashboard } from './executive.service.js';
 
-const RSRP_COL_NAMES = ['rsrp', 'rsrp_dbm', 'rsrp (dbm)', 'lte rsrp', 'serving rsrp'];
-const RSRQ_COL_NAMES = ['rsrq', 'rsrq_db', 'rsrq (db)', 'lte rsrq'];
+// ── Percentile / CSSR / CDR helpers ─────────────────────────────────────────
+
+function computePercentiles(values, pcts = [5, 25, 50, 90, 95]) {
+  const sorted = values.filter((v) => v != null && !isNaN(v)).map(Number).sort((a, b) => a - b);
+  if (!sorted.length) return Object.fromEntries(pcts.map((p) => [`p${p}`, null]));
+  return Object.fromEntries(pcts.map((p) => {
+    const idx = Math.max(0, Math.ceil((p / 100) * sorted.length) - 1);
+    return [`p${p}`, Number(sorted[idx].toFixed(2))];
+  }));
+}
+
+function computeCSSR(samples) {
+  const attempted = samples.filter((s) => s.event_type === 'CALL_ATTEMPT' || s.call_status === 'CONNECTING').length;
+  const failed    = samples.filter((s) => s.event_type === 'CALL_FAIL'    || s.call_status === 'FAILED').length;
+  if (!attempted) return null;
+  return Number(((1 - failed / attempted) * 100).toFixed(2));
+}
+
+function computeCDR(samples) {
+  const established = samples.filter((s) => s.call_status === 'CONNECTED' || s.event_type === 'CALL_ESTABLISH').length;
+  const dropped     = samples.filter((s) => s.event_type === 'CALL_DROP').length;
+  if (!established) return null;
+  return Number(((dropped / established) * 100).toFixed(2));
+}
+
+// ── Cluster detection ────────────────────────────────────────────────────────
+
+function haversineDist(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function nominatimReverse(lat, lng) {
+  return new Promise((resolve) => {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`;
+    const req = https.get(url, { headers: { 'User-Agent': 'NTNIP-DriveTest/1.0' } }, (res) => {
+      let raw = '';
+      res.on('data', (c) => { raw += c; });
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(raw);
+          const city = j.address?.city || j.address?.town || j.address?.village || j.address?.county || null;
+          resolve(city);
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+  });
+}
+
+export async function resolveCluster(lat, lng) {
+  if (lat == null || lng == null) return null;
+  const clusters = await query('SELECT cluster_id, cluster_name, center_lat, center_lng, radius_km FROM drive_test_clusters');
+  let best = null, bestDist = Infinity;
+  for (const c of clusters) {
+    const d = haversineDist(lat, lng, Number(c.center_lat), Number(c.center_lng));
+    if (d <= Number(c.radius_km) && d < bestDist) { bestDist = d; best = c; }
+  }
+  if (best) return best.cluster_name;
+
+  // No match — reverse geocode and auto-create
+  const city = await nominatimReverse(lat, lng);
+  const baseName = city ? city.replace(/\s+/g, ' ').trim() : 'Unknown';
+
+  // Find next CL number for this city
+  const existing = clusters.filter((c) => c.cluster_name.startsWith(baseName + ' CL'));
+  const nums = existing.map((c) => parseInt(c.cluster_name.replace(baseName + ' CL', ''), 10)).filter((n) => !isNaN(n));
+  const nextNum = nums.length ? Math.max(...nums) + 1 : 1;
+  const clusterName = `${baseName} CL${String(nextNum).padStart(2, '0')}`;
+
+  await query(
+    'INSERT IGNORE INTO drive_test_clusters (cluster_name, center_lat, center_lng, radius_km) VALUES (:n, :lat, :lng, 10.00)',
+    { n: clusterName, lat, lng },
+  );
+  return clusterName;
+}
+
+const RSRP_COL_NAMES = ['rsrp', 'rsrp_dbm', 'rsrp (dbm)', 'lte rsrp', 'serving rsrp', 'rscp', 'rscp_dbm', 'rscp (dbm)'];
+const RSRQ_COL_NAMES = ['rsrq', 'rsrq_db', 'rsrq (db)', 'lte rsrq', 'ecno', 'ecno_db', 'ec/no', 'ec_no'];
 const SINR_COL_NAMES = ['sinr', 'sinr_db', 'sinr (db)', 'lte sinr', 'cinr'];
 const LAT_COL_NAMES = ['latitude', 'lat', 'gps_lat', 'gps latitude'];
 const LON_COL_NAMES = ['longitude', 'lon', 'lng', 'gps_lon', 'gps longitude'];
@@ -63,8 +145,14 @@ export async function ensureTables() {
     dl_throughput DECIMAL(10,2), ul_throughput DECIMAL(10,2),
     pci INT, earfcn INT, band VARCHAR(20),
     event_type VARCHAR(50), call_status VARCHAR(20), serving_cell VARCHAR(50),
+    rtt_ms DECIMAL(8,2) NULL, jitter_ms DECIMAL(8,2) NULL,
+    packet_loss_pct DECIMAL(5,2) NULL, mos DECIMAL(3,1) NULL,
     INDEX idx_dt_latlon (drive_test_id, latitude, longitude)
   )`);
+  try { await query(`ALTER TABLE drive_test_samples ADD COLUMN rtt_ms DECIMAL(8,2) NULL`); } catch {}
+  try { await query(`ALTER TABLE drive_test_samples ADD COLUMN jitter_ms DECIMAL(8,2) NULL`); } catch {}
+  try { await query(`ALTER TABLE drive_test_samples ADD COLUMN packet_loss_pct DECIMAL(5,2) NULL`); } catch {}
+  try { await query(`ALTER TABLE drive_test_samples ADD COLUMN mos DECIMAL(3,1) NULL`); } catch {}
 }
 
 export async function importDriveTest(operatorId, meta, buffer, filename) {
@@ -98,6 +186,12 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
   fs.writeFileSync(localFilePath, buffer);
   const dbFilePath = `uploads/drivetests/${storedFilename}`;
 
+  const is3G = headers.some(h => {
+    const l = String(h).toLowerCase();
+    return l.includes('rscp') || l.includes('ecno') || l.includes('ec/no') || l.includes('ec_no');
+  });
+  const detectedTech = is3G ? '3G' : '4G';
+
   return withTransaction(async ({ q }) => {
     const ins = await q(
       `INSERT INTO drive_tests (operator_id, test_name, test_date, route_type, technology, device_model, tester_name, notes, file_path, file_hash)
@@ -107,7 +201,7 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
         name: meta.testName || filename,
         date: meta.testDate || new Date().toISOString().slice(0, 10),
         route: meta.routeType || 'urban',
-        tech: meta.technology || null,
+        tech: meta.technology || detectedTech,
         device: meta.deviceModel || null,
         tester: meta.testerName || null,
         notes: meta.notes || null,
@@ -162,11 +256,12 @@ export async function importDriveTest(operatorId, meta, buffer, filename) {
       rsrp: rsrpCol ? parseFloat(r[rsrpCol]) : null,
       sinr: sinrCol ? parseFloat(r[sinrCol]) : null,
     }));
-    const score = await calculateOverallScore(samplesForScoring);
-    
+    const csvTech = meta.technology || null;
+    const score = await calculateOverallScore(samplesForScoring, null, csvTech);
+
     // Get operator name for AI summary
     const [opRes] = await q('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
-    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, distKm.toFixed(2), validSamples);
+    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, distKm.toFixed(2), validSamples, null, csvTech);
 
     await q(
       `UPDATE drive_tests SET total_samples = :s, distance_km = :d, overall_score = :score, ai_summary = :aiSummary, status = 'COMPLETED' WHERE drive_test_id = :id`,
@@ -205,10 +300,10 @@ export async function importTrpFile(operatorId, meta, buffer, filename) {
       || (parsed.summary.startTime ? parsed.summary.startTime.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
 
     const { calculateOverallScore, generateAiSummary, computeDetailedStats } = await import('./scoring.service.js');
-    const score = await calculateOverallScore(parsed.samples);
-    const stats = computeDetailedStats(parsed.samples);
+    const score = await calculateOverallScore(parsed.samples, null, technology);
+    const stats = await computeDetailedStats(parsed.samples);
     const [opRes] = await q('SELECT operator_name FROM operators WHERE operator_id = ?', [operatorId]);
-    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, parsed.summary.distanceKm.toFixed(2), parsed.samples.length, stats);
+    const aiSummary = await generateAiSummary(opRes?.operator_name || 'Unknown', score, parsed.summary.distanceKm.toFixed(2), parsed.samples.length, stats, technology);
 
     const ins = await q(
       `INSERT INTO drive_tests (operator_id, test_name, test_date, route_type, technology,
@@ -243,13 +338,16 @@ export async function importTrpFile(operatorId, meta, buffer, filename) {
         s.latitude, s.longitude,
         s.rsrp, s.rsrq, s.sinr, null,
         s.dl_throughput, s.ul_throughput,
-        s.pci, s.earfcn, s.band, null, null, null,
+        s.pci, s.earfcn, s.band,
+        s.event_type ?? null, s.call_status ?? null, null,
+        s.rtt_ms ?? null, s.jitter_ms ?? null, s.packet_loss_pct ?? null, s.mos ?? null,
       ]);
       await q(
         `INSERT INTO drive_test_samples
          (drive_test_id, ts, latitude, longitude, rsrp, rsrq, sinr, rssi,
-          dl_throughput, ul_throughput, pci, earfcn, band, event_type, call_status, serving_cell)
-         VALUES ${values.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',')}`,
+          dl_throughput, ul_throughput, pci, earfcn, band, event_type, call_status, serving_cell,
+          rtt_ms, jitter_ms, packet_loss_pct, mos)
+         VALUES ${values.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',')}`,
         values.flat(),
       );
     }
@@ -418,6 +516,64 @@ export async function getDriveTestSamples(driveTestId) {
   );
 }
 
+export async function getClusterSamples(testIds) {
+  if (!testIds?.length) return [];
+  const placeholders = testIds.map((_, i) => `:id${i}`).join(',');
+  const params = Object.fromEntries(testIds.map((id, i) => [`id${i}`, id]));
+  return query(
+    `SELECT s.sample_id, s.drive_test_id, s.latitude, s.longitude,
+            s.rsrp, s.rsrq, s.sinr, s.dl_throughput, s.ul_throughput,
+            dt.operator_id, dt.technology, dt.test_name,
+            o.operator_name
+       FROM drive_test_samples s
+       JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id
+       JOIN operators o ON o.operator_id = dt.operator_id
+       WHERE s.drive_test_id IN (${placeholders})
+       ORDER BY s.drive_test_id, s.sample_id`,
+    params,
+  );
+}
+
+export async function getSignalThresholds() {
+  return query('SELECT * FROM signal_thresholds ORDER BY technology, metric');
+}
+
+export async function updateSignalThreshold(id, data) {
+  const { label, unit, pass_value, pass_direction, bins } = data;
+  await query(
+    `UPDATE signal_thresholds SET label=:label, unit=:unit, pass_value=:pass_value,
+     pass_direction=:pass_direction, bins=:bins WHERE id=:id`,
+    { id, label, unit, pass_value, pass_direction, bins: typeof bins === 'string' ? bins : JSON.stringify(bins) }
+  );
+  return query('SELECT * FROM signal_thresholds WHERE id=:id', { id }).then(r => r[0]);
+}
+
+export async function getThroughputAnalysis(cluster, technology) {
+  let where = 'WHERE s.dl_throughput IS NOT NULL AND s.dl_throughput > 0';
+  const params = {};
+  if (cluster) {
+    where += ' AND dt.test_name LIKE :cluster';
+    params.cluster = `%— ${cluster} —%`;
+  }
+  if (technology) {
+    where += ' AND dt.technology = :tech';
+    params.tech = technology;
+  }
+  const rows = await query(
+    `SELECT dt.drive_test_id, dt.test_name, dt.technology,
+            o.operator_name, o.operator_id,
+            s.sample_id, s.latitude, s.longitude,
+            s.dl_throughput, s.ul_throughput, s.rsrp, s.rsrq, s.sinr
+       FROM drive_test_samples s
+       JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id
+       JOIN operators o ON o.operator_id = dt.operator_id
+       ${where}
+       ORDER BY o.operator_name, dt.test_name, s.sample_id`,
+    params,
+  );
+  return rows;
+}
+
 export async function getDriveTestAnalysis(driveTestId) {
   const [meta] = await query(
     `SELECT dt.*, o.operator_name FROM drive_tests dt
@@ -433,6 +589,8 @@ export async function getDriveTestAnalysis(driveTestId) {
             ROUND(AVG(sinr), 2) AS avg_sinr, ROUND(MIN(sinr), 2) AS min_sinr, ROUND(MAX(sinr), 2) AS max_sinr,
             ROUND(AVG(dl_throughput), 2) AS avg_dl, ROUND(MAX(dl_throughput), 2) AS max_dl,
             ROUND(AVG(ul_throughput), 2) AS avg_ul, ROUND(MAX(ul_throughput), 2) AS max_ul,
+            ROUND(AVG(rtt_ms), 2) AS avg_rtt, ROUND(AVG(jitter_ms), 2) AS avg_jitter,
+            ROUND(AVG(packet_loss_pct), 2) AS avg_packet_loss, ROUND(AVG(mos), 2) AS avg_mos,
             SUM(CASE WHEN rsrp >= -80 THEN 1 ELSE 0 END) AS rsrp_excellent,
             SUM(CASE WHEN rsrp >= -90 AND rsrp < -80 THEN 1 ELSE 0 END) AS rsrp_good,
             SUM(CASE WHEN rsrp >= -100 AND rsrp < -90 THEN 1 ELSE 0 END) AS rsrp_fair,
@@ -441,7 +599,29 @@ export async function getDriveTestAnalysis(driveTestId) {
        FROM drive_test_samples WHERE drive_test_id = :id`, { id: driveTestId }
   );
 
-  return { meta, stats };
+  const rawSamples = await query(
+    `SELECT rsrp, sinr, dl_throughput, ul_throughput, rtt_ms, jitter_ms, mos,
+            event_type, call_status
+       FROM drive_test_samples WHERE drive_test_id = :id`, { id: driveTestId }
+  );
+
+  const percentiles = {
+    rsrp: computePercentiles(rawSamples.map((s) => s.rsrp)),
+    sinr: computePercentiles(rawSamples.map((s) => s.sinr)),
+    dl:   computePercentiles(rawSamples.map((s) => s.dl_throughput)),
+    ul:   computePercentiles(rawSamples.map((s) => s.ul_throughput)),
+    rtt:  computePercentiles(rawSamples.map((s) => s.rtt_ms)),
+    mos:  computePercentiles(rawSamples.map((s) => s.mos)),
+  };
+
+  const callQuality = {
+    cssr_pct: computeCSSR(rawSamples),
+    cdr_pct:  computeCDR(rawSamples),
+    call_drops: rawSamples.filter((s) => s.event_type === 'CALL_DROP').length,
+    handovers:  rawSamples.filter((s) => s.event_type === 'HANDOVER').length,
+  };
+
+  return { meta, stats, percentiles, callQuality };
 }
 
 export async function deleteDriveTest(driveTestId) {
@@ -590,6 +770,12 @@ export async function getComplianceSummary(driveTestId, thresholds = {}) {
     { ...t, id: driveTestId }
   );
 
+  const rawSamples = await query(
+    `SELECT rsrp, sinr, dl_throughput, ul_throughput, rtt_ms, jitter_ms, mos,
+            event_type, call_status
+       FROM drive_test_samples WHERE drive_test_id = :id`, { id: driveTestId }
+  );
+
   const [meta] = await query(
     `SELECT dt.*, o.operator_name FROM drive_tests dt
        JOIN operators o ON o.operator_id = dt.operator_id
@@ -612,6 +798,17 @@ export async function getComplianceSummary(driveTestId, thresholds = {}) {
     distribution: {
       excellent: row.rsrp_excellent, good: row.rsrp_good,
       fair: row.rsrp_fair, poor: row.rsrp_poor, noSignal: row.rsrp_no_signal,
+    },
+    percentiles: {
+      rsrp: computePercentiles(rawSamples.map((s) => s.rsrp)),
+      sinr: computePercentiles(rawSamples.map((s) => s.sinr)),
+      dl:   computePercentiles(rawSamples.map((s) => s.dl_throughput)),
+      rtt:  computePercentiles(rawSamples.map((s) => s.rtt_ms)),
+      mos:  computePercentiles(rawSamples.map((s) => s.mos)),
+    },
+    callQuality: {
+      cssr_pct: computeCSSR(rawSamples),
+      cdr_pct:  computeCDR(rawSamples),
     },
   };
 }
@@ -636,14 +833,26 @@ export async function getDashboardSummary(dateFrom, dateTo) {
        FROM drive_tests dt
        JOIN operators o ON o.operator_id = dt.operator_id
        LEFT JOIN (
-         SELECT drive_test_id,
+         SELECT s.drive_test_id,
                 COUNT(*) AS total,
-                AVG(rsrp) AS avg_rsrp, AVG(sinr) AS avg_sinr, AVG(dl_throughput) AS avg_dl,
-                SUM(CASE WHEN rsrp >= -100 THEN 1 ELSE 0 END) AS rsrp_pass,
-                SUM(CASE WHEN sinr >= 0 THEN 1 ELSE 0 END) AS sinr_pass,
-                SUM(CASE WHEN event_type = 'CALL_DROP' THEN 1 ELSE 0 END) AS call_drops,
-                SUM(CASE WHEN event_type = 'HANDOVER' THEN 1 ELSE 0 END) AS handovers
-           FROM drive_test_samples GROUP BY drive_test_id
+                AVG(s.rsrp) AS avg_rsrp, AVG(s.sinr) AS avg_sinr, AVG(s.dl_throughput) AS avg_dl,
+                SUM(CASE
+                  WHEN dtt.technology = '3G' AND s.rsrp >= -70  THEN 1
+                  WHEN dtt.technology = '4G' AND s.rsrp >= -100 THEN 1
+                  WHEN dtt.technology = '2G' AND s.rsrq IS NOT NULL AND s.rsrq <= 3 THEN 1
+                  ELSE 0
+                END) AS rsrp_pass,
+                SUM(CASE
+                  WHEN dtt.technology = '3G' AND s.rsrq >= -10 THEN 1
+                  WHEN dtt.technology = '4G' AND s.sinr >= 0   THEN 1
+                  WHEN dtt.technology = '2G' AND s.rsrq IS NOT NULL AND s.rsrq <= 3 THEN 1
+                  ELSE 0
+                END) AS sinr_pass,
+                SUM(CASE WHEN s.event_type = 'CALL_DROP' THEN 1 ELSE 0 END) AS call_drops,
+                SUM(CASE WHEN s.event_type = 'HANDOVER'  THEN 1 ELSE 0 END) AS handovers
+           FROM drive_test_samples s
+           JOIN drive_tests dtt ON dtt.drive_test_id = s.drive_test_id
+           GROUP BY s.drive_test_id
        ) sub ON sub.drive_test_id = dt.drive_test_id
        ${where}
        GROUP BY o.operator_id, o.operator_name

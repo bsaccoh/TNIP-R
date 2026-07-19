@@ -222,7 +222,8 @@ export async function getReportData(regionId = null) {
   const sampleSql = `
     SELECT s.ts AS timestamp, s.latitude AS lat, s.longitude AS lon,
            s.rsrp, s.rsrq, s.sinr, s.dl_throughput AS dl, s.ul_throughput AS ul,
-           s.pci, o.operator_name AS operator
+           s.pci, s.rtt_ms, s.jitter_ms, s.packet_loss_pct, s.mos,
+           s.event_type, s.call_status, o.operator_name AS operator
     FROM drive_test_samples s
     JOIN drive_tests dt ON dt.drive_test_id = s.drive_test_id AND dt.status = 'completed'
     JOIN operators o ON o.operator_id = dt.operator_id
@@ -230,6 +231,34 @@ export async function getReportData(regionId = null) {
     ORDER BY s.ts DESC
     LIMIT 5000`;
   const samples = await query(sampleSql);
+
+  /* ── Per-operator percentiles from sample data ── */
+  function pctile(arr, p) {
+    const sorted = arr.filter((v) => v != null && !isNaN(v)).map(Number).sort((a, b) => a - b);
+    if (!sorted.length) return null;
+    const idx = Math.max(0, Math.ceil((p / 100) * sorted.length) - 1);
+    return +sorted[idx].toFixed(2);
+  }
+
+  for (const op of operators) {
+    const opSamples = samples.filter((s) => s.operator === op.name);
+    op.percentiles = {
+      rsrp: { p5: pctile(opSamples.map((s) => s.rsrp), 5), p50: pctile(opSamples.map((s) => s.rsrp), 50), p95: pctile(opSamples.map((s) => s.rsrp), 95) },
+      sinr: { p5: pctile(opSamples.map((s) => s.sinr), 5), p50: pctile(opSamples.map((s) => s.sinr), 50), p95: pctile(opSamples.map((s) => s.sinr), 95) },
+      dl:   { p5: pctile(opSamples.map((s) => s.dl), 5), p50: pctile(opSamples.map((s) => s.dl), 50), p95: pctile(opSamples.map((s) => s.dl), 95) },
+      rtt:  { p50: pctile(opSamples.map((s) => s.rtt_ms), 50), p95: pctile(opSamples.map((s) => s.rtt_ms), 95) },
+      mos:  { p50: pctile(opSamples.map((s) => s.mos), 50) },
+    };
+    const attempted = opSamples.filter((s) => s.event_type === 'CALL_ATTEMPT' || s.call_status === 'CONNECTING').length;
+    const failed    = opSamples.filter((s) => s.event_type === 'CALL_FAIL'    || s.call_status === 'FAILED').length;
+    const established = opSamples.filter((s) => s.call_status === 'CONNECTED'  || s.event_type === 'CALL_ESTABLISH').length;
+    const dropped   = opSamples.filter((s) => s.event_type === 'CALL_DROP').length;
+    op.callQuality = {
+      cssr: attempted ? +((1 - failed / attempted) * 100).toFixed(2) : null,
+      cdr:  established ? +((dropped / established) * 100).toFixed(2) : null,
+      drops: dropped,
+    };
+  }
 
   /* ── AI Summary ── */
   const aiParts = [];
@@ -573,6 +602,36 @@ export async function generatePdfReport(regionId = null) {
     ]);
     drawTable(compHeaders, compRows, compCols);
 
+    // ══════════════ PERCENTILE DISTRIBUTION ══════════════
+    sectionTitle('Signal Quality Percentiles (ITU-T / ETSI EG 202 057)');
+    const pctHeaders = ['Operator', 'RSRP P5', 'RSRP P50', 'RSRP P95', 'SINR P5', 'SINR P50', 'DL P50 (kbps)', 'RTT P50 (ms)', 'MOS P50'];
+    const pctCols = [90, 55, 55, 55, 55, 55, 75, 65, 55];
+    const pctRows = data.operators.map(o => {
+      const p = o.percentiles || {};
+      return [
+        o.name,
+        p.rsrp?.p5 ?? 'N/A', p.rsrp?.p50 ?? 'N/A', p.rsrp?.p95 ?? 'N/A',
+        p.sinr?.p5 ?? 'N/A', p.sinr?.p50 ?? 'N/A',
+        p.dl?.p50 != null ? Number(p.dl.p50).toFixed(0) : 'N/A',
+        p.rtt?.p50 ?? 'N/A',
+        p.mos?.p50 ?? 'N/A',
+      ];
+    });
+    drawTable(pctHeaders, pctRows, pctCols);
+
+    // ══════════════ CALL QUALITY (CSSR / CDR) ══════════════
+    const hasCallData = data.operators.some(o => o.callQuality?.cssr != null || o.callQuality?.cdr != null || (o.callQuality?.drops ?? 0) > 0);
+    if (hasCallData) {
+      sectionTitle('Call Quality Indicators (ITU-T E.800)');
+      const cqHeaders = ['Operator', 'CSSR (%)', 'CDR (%)', 'Call Drops'];
+      const cqCols = [160, 100, 100, 110];
+      const cqRows = data.operators.map(o => {
+        const cq = o.callQuality || {};
+        return [o.name, cq.cssr != null ? cq.cssr : 'N/A', cq.cdr != null ? cq.cdr : 'N/A', cq.drops ?? 0];
+      });
+      drawTable(cqHeaders, cqRows, cqCols);
+    }
+
     // ══════════════ REGIONAL COMPARISON (national only) ══════════════
     if (!regionId && data.regions.length) {
       sectionTitle('Regional Comparison');
@@ -768,7 +827,42 @@ export async function generateExcelReport(regionId = null) {
     XLSX.utils.book_append_sheet(wb, wsReg, 'Regional Summary');
   }
 
-  // ── Sheet 5: Problem Areas ──
+  // ── Sheet 5: Percentile Distribution (ETSI EG 202 057) ──
+  const pctHeader = [
+    'Operator',
+    'RSRP P5 (dBm)', 'RSRP P50 (dBm)', 'RSRP P95 (dBm)',
+    'SINR P5 (dB)', 'SINR P50 (dB)', 'SINR P95 (dB)',
+    'DL P5 (kbps)', 'DL P50 (kbps)', 'DL P95 (kbps)',
+    'RTT P50 (ms)', 'RTT P95 (ms)',
+    'MOS P50',
+  ];
+  const pctExcelRows = data.operators.map(o => {
+    const p = o.percentiles || {};
+    return [
+      o.name,
+      p.rsrp?.p5 ?? '', p.rsrp?.p50 ?? '', p.rsrp?.p95 ?? '',
+      p.sinr?.p5 ?? '', p.sinr?.p50 ?? '', p.sinr?.p95 ?? '',
+      p.dl?.p5 ?? '', p.dl?.p50 ?? '', p.dl?.p95 ?? '',
+      p.rtt?.p50 ?? '', p.rtt?.p95 ?? '',
+      p.mos?.p50 ?? '',
+    ];
+  });
+  const wsPct = XLSX.utils.aoa_to_sheet([pctHeader, ...pctExcelRows]);
+  wsPct['!cols'] = pctHeader.map(() => ({ wch: 14 }));
+  wsPct['!cols'][0] = { wch: 25 };
+  XLSX.utils.book_append_sheet(wb, wsPct, 'Percentile Distribution');
+
+  // ── Sheet 6: Call Quality (ITU-T E.800) ──
+  const cqHeader = ['Operator', 'CSSR (%)', 'CDR (%)', 'Call Drops'];
+  const cqExcelRows = data.operators.map(o => {
+    const cq = o.callQuality || {};
+    return [o.name, cq.cssr ?? '', cq.cdr ?? '', cq.drops ?? 0];
+  });
+  const wsCq = XLSX.utils.aoa_to_sheet([cqHeader, ...cqExcelRows]);
+  wsCq['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, wsCq, 'Call Quality');
+
+  // ── Sheet 7: Problem Areas ──
   const paHeader = ['Location Name', 'Nearest Site (km)', 'Latitude', 'Longitude', 'Issue', 'Severity', 'Sample Count'];
   const paRows = data.problemAreas.map(p => [
     p.locationName, p.siteDistanceKm, Number(p.lat), Number(p.lon),
@@ -778,18 +872,22 @@ export async function generateExcelReport(regionId = null) {
   wsPa['!cols'] = [{ wch: 26 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, wsPa, 'Problem Areas');
 
-  // ── Sheet 6: Sample Data ──
-  const sHeader = ['Timestamp', 'Latitude', 'Longitude', 'RSRP (dBm)', 'RSRQ (dB)', 'SINR (dB)', 'DL (kbps)', 'UL (kbps)', 'PCI', 'Operator'];
+  // ── Sheet 8: Sample Data ──
+  const sHeader = [
+    'Timestamp', 'Latitude', 'Longitude', 'RSRP (dBm)', 'RSRQ (dB)', 'SINR (dB)',
+    'DL (kbps)', 'UL (kbps)', 'PCI', 'RTT (ms)', 'Jitter (ms)', 'Packet Loss (%)', 'MOS', 'Operator',
+  ];
   const sRows = data.samples.map(s => [
-    s.timestamp, s.lat, s.lon, s.rsrp, s.rsrq, s.sinr, s.dl, s.ul, s.pci, s.operator,
+    s.timestamp, s.lat, s.lon, s.rsrp, s.rsrq, s.sinr, s.dl, s.ul, s.pci,
+    s.rtt_ms, s.jitter_ms, s.packet_loss_pct, s.mos, s.operator,
   ]);
   const wsSamples = XLSX.utils.aoa_to_sheet([sHeader, ...sRows]);
   wsSamples['!cols'] = sHeader.map(() => ({ wch: 14 }));
   wsSamples['!cols'][0] = { wch: 22 };
-  wsSamples['!cols'][9] = { wch: 20 };
+  wsSamples['!cols'][13] = { wch: 20 };
   XLSX.utils.book_append_sheet(wb, wsSamples, 'Sample Data');
 
-  // ── Sheet 7: Config ──
+  // ── Sheet 9: Config ──
   const cfgHeader = ['Setting', 'Value'];
   const cfgRows = Object.entries(data.config).map(([k, v]) => [k, v]);
   const wsCfg = XLSX.utils.aoa_to_sheet([cfgHeader, ...cfgRows]);
@@ -797,4 +895,21 @@ export async function generateExcelReport(regionId = null) {
   XLSX.utils.book_append_sheet(wb, wsCfg, 'Config');
 
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+export async function generateClusterPdf(htmlContent) {
+  const puppeteer = (await import('puppeteer')).default;
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  const page = await browser.newPage();
+  await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+  const pdfBuffer = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: { top: '10mm', right: '12mm', bottom: '10mm', left: '12mm' }
+  });
+  await browser.close();
+  return Buffer.from(pdfBuffer);
 }

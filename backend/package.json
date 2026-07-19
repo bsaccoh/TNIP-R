@@ -25,6 +25,7 @@
     "node-cron": "^4.5.0",
     "nodemailer": "^9.0.1",
     "pdfkit": "^0.19.1",
+    "puppeteer": "^25.3.0",
     "ssh2-sftp-client": "^11.0.0",
     "swagger-ui-express": "^5.0.1",
     "tar-stream": "^3.1.7",

@@ -8,6 +8,8 @@ import {
   ToggleButtonGroup, ToggleButton, Slider,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import MapIcon from '@mui/icons-material/Map';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RouteIcon from '@mui/icons-material/Route';
@@ -264,6 +266,52 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
 
   const isBatch = files.length > 1;
 
+  const detectFromFilename = (filename, relativePath = '') => {
+    // Use all path segments (folder names + filename) for richer detection
+    const segments = relativePath
+      ? relativePath.split(/[/\\]/).map((s) => s.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' '))
+      : [filename.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ')];
+    const allText = segments.join(' ');
+    const lower = allText.toLowerCase();
+
+    // Find ALL operator matches; first = primary owner, rest = competitor data in same file
+    const matchedOps = operators.filter((o) => lower.includes(o.operator_name.toLowerCase()));
+    const detectedOp = matchedOps[0] || null;
+    const extraOps = matchedOps.slice(1);
+
+    let detectedTech = null;
+    if (/\b5g\b|5gnr/i.test(lower)) detectedTech = '5G';
+    else if (/\b4g\b|\blte\b/i.test(lower)) detectedTech = '4G';
+    else if (/\b3g\b|\bumts\b|\bwcdma\b/i.test(lower)) detectedTech = '3G';
+    else if (/\b2g\b|\bgsm\b/i.test(lower)) detectedTech = '2G';
+
+    let detectedType = null;
+    if (/\bdl\b/i.test(lower)) detectedType = 'DL';
+    else if (/\bul\b/i.test(lower)) detectedType = 'UL';
+    else if (/\bping\b/i.test(lower)) detectedType = 'Ping';
+    else if (/\bidle\b/i.test(lower)) detectedType = 'Idle';
+    else if (/\bmos\b/i.test(lower)) detectedType = 'MOS';
+
+    let detectedCluster = null;
+    const clusterMatch = allText.match(/\b([A-Za-z]+)\s*(CL\s*\d+)\b/i);
+    if (clusterMatch) detectedCluster = `${clusterMatch[1].charAt(0).toUpperCase() + clusterMatch[1].slice(1).toLowerCase()} ${clusterMatch[2].toUpperCase().replace(/\s+/g, '')}`;
+
+    let detectedDate = null;
+    // Human-readable: "18 Jan 2026" or "18_Jan_2026"
+    const humanDate = allText.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s*(\d{4})/i);
+    if (humanDate) {
+      const months = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+      detectedDate = `${humanDate[3]}-${months[humanDate[2].toLowerCase().slice(0, 3)]}-${humanDate[1].padStart(2, '0')}`;
+    }
+    // ISO compact: "20260118T085826Z" or bare "20260118"
+    if (!detectedDate) {
+      const isoMatch = allText.match(/\b(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:T\d{6}Z?)?\b/);
+      if (isoMatch) detectedDate = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    }
+
+    return { operator: detectedOp, extraOps, technology: detectedTech, testType: detectedType, cluster: detectedCluster, date: detectedDate, filename };
+  };
+
   const handleFilesSelected = async (selectedFiles) => {
     setFiles(selectedFiles);
     setResult(null);
@@ -272,38 +320,86 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
     if (!selectedFiles.length) return;
 
     const hasTrp = selectedFiles.some((f) => f.name.toLowerCase().endsWith('.trp'));
-    if (!hasTrp) return;
 
-    setDetecting(true);
-    try {
-      const fd = new FormData();
-      for (const f of selectedFiles) fd.append('file', f);
-      const token = localStorage.getItem('tnipr_access');
-      const res = await fetch(`${BASE}/drive-tests/preview`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!res.ok) throw new Error('Preview failed');
-      const json = await res.json();
-      const previews = json.data || [];
-      setDetected(previews);
+    if (hasTrp) {
+      setDetecting(true);
+      try {
+        const fd = new FormData();
+        for (const f of selectedFiles) fd.append('file', f);
+        const token = localStorage.getItem('tnipr_access');
+        const res = await fetch(`${BASE}/drive-tests/preview`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (!res.ok) throw new Error('Preview failed');
+        const json = await res.json();
+        const previews = json.data || [];
+        setDetected(previews);
 
-      const first = previews.find((p) => !p.error);
-      if (!first) return;
+        const first = previews.find((p) => !p.error);
+        if (!first) return;
 
-      if (first.technology) setTechnology(first.technology);
-      if (first.testDate) setTestDate(first.testDate);
-      if (first.device) setDeviceModel(first.device);
-      if (first.testName && selectedFiles.length === 1) setTestName(first.testName);
+        if (first.technology) setTechnology(first.technology);
+        if (first.testDate) setTestDate(first.testDate);
+        if (first.device) setDeviceModel(first.device);
 
-      if (first.operator) {
-        const match = operators.find((o) =>
-          o.operator_name.toLowerCase().includes(first.operator.split(' ')[0].toLowerCase()));
-        if (match) setOpId(match.operator_id);
+        let opMatch = null;
+        if (first.operator) {
+          opMatch = operators.find((o) =>
+            o.operator_name.toLowerCase().includes(first.operator.split(' ')[0].toLowerCase()));
+          if (opMatch) setOpId(opMatch.operator_id);
+        }
+        // Fallback: operator not in filename — try the folder path (webkitRelativePath)
+        if (!opMatch) {
+          const anyFile = selectedFiles.find((f) => f.webkitRelativePath);
+          if (anyFile?.webkitRelativePath) {
+            const folderDetect = detectFromFilename(anyFile.name, anyFile.webkitRelativePath);
+            if (folderDetect.operator) {
+              opMatch = folderDetect.operator;
+              setOpId(folderDetect.operator.operator_id);
+            }
+          }
+        }
+
+        if (selectedFiles.length === 1) {
+          if (first.cluster && opMatch && first.technology) {
+            const dateLabel = first.testDate
+              ? new Date(first.testDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : '';
+            setTestName(`${opMatch.operator_name} ${first.technology} — ${first.cluster}${dateLabel ? ' — ' + dateLabel : ''}`);
+          } else if (first.testName) {
+            setTestName(first.testName);
+          }
+        }
+      } catch {}
+      finally { setDetecting(false); }
+    } else {
+      const detections = selectedFiles.map((f) => detectFromFilename(f.name, f.webkitRelativePath || ''));
+      const valid = detections.filter((d) => d.operator || d.technology);
+      if (valid.length) {
+        setDetected(valid.map((d) => ({
+          filename: d.filename,
+          operator: d.operator?.operator_name || null,
+          extraOps: d.extraOps?.map((o) => o.operator_name) || [],
+          technology: d.technology || null,
+          testDate: d.date || null,
+          cluster: d.cluster || null,
+          testName: d.operator && d.technology && d.testType && d.cluster
+            ? `${d.operator.operator_name} ${d.technology} ${d.testType} — ${d.cluster}${d.date ? ' — ' + new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}`
+            : null,
+        })));
+
+        const first = valid[0];
+        if (first.operator) setOpId(first.operator.operator_id);
+        if (first.technology) setTechnology(first.technology);
+        if (first.date) setTestDate(first.date);
+        if (first.cluster && first.testType && first.operator && selectedFiles.length === 1) {
+          const dateLabel = first.date ? new Date(first.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+          setTestName(`${first.operator.operator_name} ${first.technology || '4G'} ${first.testType} — ${first.cluster}${dateLabel ? ' — ' + dateLabel : ''}`);
+        }
       }
-    } catch {}
-    finally { setDetecting(false); }
+    }
   };
 
   const handleUpload = async () => {
@@ -343,7 +439,7 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
   };
 
   const fileLabel = files.length === 0
-    ? 'Select Files (CSV, Excel, or TEMS .trp)'
+    ? null
     : files.length === 1
       ? files[0].name
       : `${files.length} files selected`;
@@ -353,33 +449,68 @@ function UploadDialog({ open, onClose, operators, onUploaded }) {
       <DialogTitle>Upload Drive Test Data</DialogTitle>
       <DialogContent>
         <Stack spacing={2} mt={1}>
-          <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} fullWidth>
-            {fileLabel}
-            <input type="file" hidden multiple accept=".csv,.xlsx,.xls,.trp"
-              onChange={(e) => handleFilesSelected(Array.from(e.target.files || []))} />
-          </Button>
+          {/* File / Folder selection row */}
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} sx={{ flex: 1 }}>
+              Select Files
+              <input type="file" hidden multiple accept=".csv,.xlsx,.xls,.trp"
+                onChange={(e) => handleFilesSelected(Array.from(e.target.files || []))} />
+            </Button>
+            <Button variant="outlined" component="label" startIcon={<FolderOpenIcon />} sx={{ flex: 1 }}
+              title="Select an entire folder — all CSV, Excel and TRP files inside will be uploaded">
+              Select Folder
+              <input type="file" hidden multiple
+                /* eslint-disable-next-line react/no-unknown-property */
+                webkitdirectory=""
+                onChange={(e) => {
+                  const all = Array.from(e.target.files || []);
+                  const supported = all.filter((f) => /\.(csv|xlsx|xls|trp)$/i.test(f.name));
+                  handleFilesSelected(supported);
+                }} />
+            </Button>
+          </Stack>
+          {fileLabel && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1, ml: 0.5 }}>
+              {fileLabel}
+            </Typography>
+          )}
           {detecting && (
             <Alert severity="info" icon={<CircularProgress size={18} />}>
               Reading file metadata...
             </Alert>
           )}
-          {detected && !detecting && (
-            <Alert severity="success" variant="outlined" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
-              <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block' }}>
-                Auto-detected from {detected.filter((d) => !d.error).length} file(s):
-              </Typography>
-              {detected.filter((d) => !d.error).slice(0, 3).map((d, i) => (
-                <Typography key={i} variant="caption" display="block" sx={{ color: 'text.secondary' }}>
-                  {d.filename}: {[d.operator, d.device, d.technology].filter(Boolean).join(' · ')}
-                </Typography>
-              ))}
-              {detected.filter((d) => !d.error).length > 3 && (
-                <Typography variant="caption" color="text.disabled">
-                  +{detected.filter((d) => !d.error).length - 3} more
-                </Typography>
-              )}
-            </Alert>
-          )}
+          {detected && !detecting && (() => {
+            const ok = detected.filter((d) => !d.error);
+            const multiOpFiles = ok.filter((d) => d.extraOps?.length);
+            return (
+              <Stack spacing={0.5}>
+                <Alert severity="success" variant="outlined" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+                  <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block' }}>
+                    Auto-detected from {ok.length} file(s):
+                  </Typography>
+                  {ok.slice(0, 4).map((d, i) => (
+                    <Typography key={i} variant="caption" display="block" sx={{ color: 'text.secondary' }}>
+                      {d.filename}: {[d.operator, d.device, d.technology, d.cluster].filter(Boolean).join(' · ')}
+                    </Typography>
+                  ))}
+                  {ok.length > 4 && (
+                    <Typography variant="caption" color="text.disabled">
+                      +{ok.length - 4} more
+                    </Typography>
+                  )}
+                </Alert>
+                {multiOpFiles.length > 0 && (
+                  <Alert severity="warning" icon={<WarningAmberIcon fontSize="small" />}
+                    sx={{ py: 0.5, '& .MuiAlert-message': { fontSize: 12 } }}>
+                    <strong>Multiple operators detected</strong> in {multiOpFiles.length} file(s)
+                    {multiOpFiles.length <= 2 && ` (${multiOpFiles.map((d) => d.filename).join(', ')})`}.
+                    {' '}The <strong>first operator</strong> ({multiOpFiles[0]?.operator}) is used as the test owner.
+                    Competitor data embedded in the file will still be imported.
+                  </Alert>
+                )}
+              </Stack>
+            );
+          })()}
           {files.length > 1 && !detected && (
             <Box sx={{ maxHeight: 120, overflow: 'auto', px: 1 }}>
               {files.map((f, i) => (

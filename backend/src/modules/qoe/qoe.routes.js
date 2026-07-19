@@ -33,6 +33,12 @@ router.get('/track/:ref', asyncHandler(async (req, res) => {
   ok(res, complaint);
 }));
 
+// Public AI chatbot assistant
+router.post('/ask', asyncHandler(async (req, res) => {
+  const result = await svc.askChatbot(req.body.question);
+  ok(res, result);
+}));
+
 /* ── Authenticated — regulator / analyst ─────────────────────────────────── */
 const canRead  = requireAccess({ permissions: ['compliance:read'] });
 const canWrite = requireAccess({ permissions: ['compliance:write'] });

@@ -1,7 +1,7 @@
 import { query } from '../../config/db.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-async function ensureTables() {
+export async function ensureTables() {
   await query(`CREATE TABLE IF NOT EXISTS consumer_complaints (
     complaint_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
     complaint_ref   VARCHAR(40)   NOT NULL UNIQUE,
@@ -224,3 +224,49 @@ export async function qoeSummary({ days = 30 } = {}) {
 
   return { counts, byOperator, byIssueType, byDistrict, trend, hotspots };
 }
+
+export async function askChatbot(question) {
+  const q = String(question || '').toLowerCase().trim();
+  if (!q) return { answer: 'How can I help you today?' };
+
+  // Rule-based responses for common consumer questions
+  if (q.includes('slow') || q.includes('internet') || q.includes('data') || q.includes('speed')) {
+    return {
+      answer: "If your internet is too slow or dropping, you have the right to complain! NatCA regulations state that operators must maintain a minimum speed. You can run a Speed Test from the home page and submit a complaint directly to us if it fails."
+    };
+  }
+  if (q.includes('tariff') || q.includes('cost') || q.includes('price') || q.includes('expensive')) {
+    return {
+      answer: "Tariffs are regulated by NatCA. The standard voice rate is 1.86 LE per minute across all networks. If you believe you are being overcharged, please check the 'Tariffs' page or submit a Billing Dispute complaint."
+    };
+  }
+  if (q.includes('sim') || q.includes('nin') || q.includes('register')) {
+    return {
+      answer: "All SIM cards must be linked to your National Identification Number (NIN). You can verify your status using the 'SIM Check' tool on the dashboard. If unlinked, visit your operator's office with your ID."
+    };
+  }
+  if (q.includes('ussd') || q.includes('code') || q.includes('balance')) {
+    return {
+      answer: "You can easily access USSD codes for all operators by tapping 'USSD Codes' on the dashboard. For example, Orange balance is *111# and Africell is *123#."
+    };
+  }
+
+  // LLM option if enabled
+  try {
+    const { llmEnabled, llmComplete } = await import('../ai/ai.provider.js');
+    if (llmEnabled()) {
+      const answer = await llmComplete({
+        system: "You are the NatCA AI Assistant. Help the consumer with their telecom issue. Keep the answer concise (2-3 sentences max) and friendly.",
+        user: question
+      });
+      return { answer };
+    }
+  } catch (err) {
+    // fallback
+  }
+
+  return {
+    answer: "I can help you with internet speeds, billing issues, SIM registration, and consumer rights. What would you like to know?"
+  };
+}
+

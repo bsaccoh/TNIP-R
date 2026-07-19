@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../app/theme/app_theme.dart';
 
 class ChatbotScreen extends StatefulWidget {
@@ -32,10 +34,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1500));
+    String botResponse;
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:4000/api/qoe/ask'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'question': text}),
+      ).timeout(const Duration(milliseconds: 3000));
 
-    final botResponse = _getBotResponse(text.toLowerCase());
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        botResponse = data['data']['answer'] ?? "I couldn't generate a response.";
+      } else {
+        botResponse = _getBotResponse(text.toLowerCase());
+      }
+    } catch (_) {
+      botResponse = _getBotResponse(text.toLowerCase());
+    }
 
     if (mounted) {
       setState(() {

@@ -133,12 +133,12 @@ export async function comparisonMatrix() {
 
 /** Per-operator KPI analytics: average, min, max, cell count, compliance status. */
 export async function operatorAnalytics() {
-  return query(
+  // 1. Fetch cell-level statistics for distribution (min/max/stddev)
+  const cellStats = await query(
     `SELECT o.operator_id, o.operator_name,
-            k.kpi_id, k.kpi_key, k.name AS kpi_name, k.unit, k.category,
+            k.kpi_id, k.kpi_key, k.name AS kpi_name, k.unit, k.category, k.direction,
             t.tech_key,
             COUNT(*) AS cell_count,
-            ROUND(AVG(ck.value), 4) AS avg_value,
             ROUND(MIN(ck.value), 4) AS min_value,
             ROUND(MAX(ck.value), 4) AS max_value,
             ROUND(STDDEV(ck.value), 4) AS std_dev,
@@ -154,10 +154,58 @@ export async function operatorAnalytics() {
        LEFT JOIN qos_thresholds qt ON qt.threshold_id = cr.threshold_id
       WHERE ck.granularity = 'DAY'
       GROUP BY o.operator_id, o.operator_name,
-               k.kpi_id, k.kpi_key, k.name, k.unit, k.category,
+               k.kpi_id, k.kpi_key, k.name, k.unit, k.category, k.direction,
                t.tech_key, cr.status, cr.required_value, qt.comparator
       ORDER BY o.operator_name, k.category, k.kpi_key`
   );
+
+  // 2. Fetch network-level raw counters dynamically to replace "average of averages"
+  const formulas = await query(
+    `SELECT f.formula_id, f.kpi_id, f.expression, k.kpi_key
+       FROM kpi_formulas f
+       JOIN kpi_definitions k ON k.kpi_id = f.kpi_id
+      WHERE f.is_active = 1`
+  );
+  const { extractCounterKeys, evaluateFormula } = await import('./formulaEvaluator.js');
+  formulas.forEach((f) => { f.counterKeys = extractCounterKeys(f.expression); });
+  const neededKeys = [...new Set(formulas.flatMap(f => f.counterKeys))];
+
+  let rawOpMap = new Map();
+  if (neededKeys.length > 0) {
+    const rawCounters = await query(
+      `SELECT o.operator_id, cd.counter_key, SUM(cv.value) AS sum_val
+         FROM counter_values cv
+         JOIN pm_files p ON p.pm_file_id = cv.pm_file_id
+         JOIN operators o ON o.operator_id = p.operator_id
+         JOIN counter_definitions cd ON cd.counter_id = cv.counter_id
+        WHERE cd.counter_key IN (:keys)
+        GROUP BY o.operator_id, cd.counter_key`,
+      { keys: neededKeys }
+    );
+    for (const row of rawCounters) {
+      if (!rawOpMap.has(row.operator_id)) rawOpMap.set(row.operator_id, new Map());
+      rawOpMap.get(row.operator_id).set(row.counter_key, Number(row.sum_val));
+    }
+  }
+
+  // 3. Patch cellStats with true avg_value
+  for (const stat of cellStats) {
+    const f = formulas.find(f => f.kpi_id === stat.kpi_id);
+    let avg_value = null;
+    if (f && rawOpMap.has(stat.operator_id)) {
+      const counters = rawOpMap.get(stat.operator_id);
+      if (f.counterKeys.every(k => counters.has(k))) {
+        try {
+          const val = evaluateFormula(f.expression, counters);
+          if (val != null && !isNaN(val)) avg_value = Number(val.toFixed(4));
+        } catch (e) {}
+      }
+    }
+    // Fallback to 0 if we couldn't evaluate it
+    stat.avg_value = avg_value ?? 0;
+  }
+
+  return cellStats;
 }
 
 /** KPI distribution: value buckets per KPI for histogram. */
@@ -181,29 +229,76 @@ const TECH_ID = { '2G': 1, '3G': 2, '4G': 3, '5G': 4 };
  */
 export async function pmKpiTimeSeries({ operatorId, technology, from, to }) {
   const technologyId = TECH_ID[technology?.toUpperCase()] ?? null;
-  const opFilter = operatorId ? 'AND ck.operator_id = :op' : '';
+  const opFilter = operatorId ? 'AND p.operator_id = :op' : '';
+  const techFilter = technologyId ? 'AND p.technology_id = :tid' : '';
+  const fromFilter = from ? 'AND cv.ts >= :from' : '';
+  const toFilter = to ? 'AND cv.ts <= :to' : '';
 
-  const series = await query(
-    `SELECT o.operator_id, o.operator_name,
-            k.kpi_key, k.name AS kpi_name, k.unit, k.category, k.direction,
-            DATE(ck.ts) AS day, ROUND(AVG(ck.value), 4) AS value
-       FROM calculated_kpis ck
-       JOIN kpi_definitions k ON k.kpi_id = ck.kpi_id
-       JOIN operators o ON o.operator_id = ck.operator_id
-      WHERE ck.granularity = 'DAY'
-        ${opFilter}
-        ${technologyId ? 'AND ck.technology_id = :tid' : ''}
-        ${from ? 'AND ck.ts >= :from' : ''}
-        ${to ? 'AND ck.ts <= :to' : ''}
-      GROUP BY o.operator_id, o.operator_name, k.kpi_key, k.name, k.unit, k.category, k.direction, DATE(ck.ts)
-      ORDER BY k.category, k.kpi_key, o.operator_name, day`,
+  const formulas = await query(
+    `SELECT f.formula_id, f.kpi_id, f.expression, k.kpi_key, k.name AS kpi_name, k.unit, k.category, k.direction
+       FROM kpi_formulas f
+       JOIN kpi_definitions k ON k.kpi_id = f.kpi_id
+      WHERE f.is_active = 1
+        ${technologyId ? 'AND (f.technology_id = :tid OR f.technology_id IS NULL)' : ''}
+        ${operatorId ? 'AND (f.operator_id = :op OR f.operator_id IS NULL)' : ''}`,
     {
+      ...(operatorId ? { op: operatorId } : {}),
+      ...(technologyId ? { tid: technologyId } : {}),
+    }
+  );
+
+  if (!formulas.length) return [];
+  const { extractCounterKeys, evaluateFormula } = await import('./formulaEvaluator.js');
+  formulas.forEach((f) => { f.counterKeys = extractCounterKeys(f.expression); });
+
+  const neededKeys = [...new Set(formulas.flatMap(f => f.counterKeys))];
+  if (!neededKeys.length) return [];
+
+  const rawCounters = await query(
+    `SELECT DATE(cv.ts) AS day, o.operator_id, o.operator_name, cd.counter_key, SUM(cv.value) AS sum_val
+       FROM counter_values cv
+       JOIN pm_files p ON p.pm_file_id = cv.pm_file_id
+       JOIN operators o ON o.operator_id = p.operator_id
+       JOIN counter_definitions cd ON cd.counter_id = cv.counter_id
+      WHERE cd.counter_key IN (:keys)
+        ${opFilter} ${techFilter} ${fromFilter} ${toFilter}
+      GROUP BY DATE(cv.ts), o.operator_id, o.operator_name, cd.counter_key
+      ORDER BY day`,
+    {
+      keys: neededKeys,
       ...(operatorId ? { op: operatorId } : {}),
       ...(technologyId ? { tid: technologyId } : {}),
       ...(from ? { from } : {}),
       ...(to ? { to } : {}),
     }
   );
+
+  const dayOpMap = new Map();
+  for (const row of rawCounters) {
+    const k = `${row.day}|${row.operator_id}|${row.operator_name}`;
+    if (!dayOpMap.has(k)) dayOpMap.set(k, new Map());
+    dayOpMap.get(k).set(row.counter_key, Number(row.sum_val));
+  }
+
+  const series = [];
+  for (const [keyStr, counters] of dayOpMap.entries()) {
+    const [day, opIdStr, opName] = keyStr.split('|');
+    const opId = Number(opIdStr);
+    for (const f of formulas) {
+      if (f.counterKeys.every((k) => counters.has(k))) {
+        try {
+          const value = evaluateFormula(f.expression, counters);
+          if (value != null && !isNaN(value)) {
+            series.push({
+              operator_id: opId, operator_name: opName,
+              kpi_key: f.kpi_key, kpi_name: f.kpi_name, unit: f.unit, category: f.category, direction: f.direction,
+              day, value: Number(value.toFixed(4))
+            });
+          }
+        } catch (e) {}
+      }
+    }
+  }
 
   const thresholds = await query(
     `SELECT k.kpi_key, qt.required_value, qt.comparator

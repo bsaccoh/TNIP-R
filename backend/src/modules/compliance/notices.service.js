@@ -2,7 +2,7 @@ import { query } from '../../config/db.js';
 import * as XLSX from 'xlsx';
 
 // Ensure compliance_notices table exists (create on first use)
-async function ensureTable() {
+export async function ensureTable() {
   await query(`CREATE TABLE IF NOT EXISTS compliance_notices (
     notice_id    INT AUTO_INCREMENT PRIMARY KEY,
     operator_id  INT NOT NULL,

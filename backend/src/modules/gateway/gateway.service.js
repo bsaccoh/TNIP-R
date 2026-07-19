@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { query } from '../../config/db.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-async function ensureTables() {
+export async function ensureTables() {
   await query(`CREATE TABLE IF NOT EXISTS operator_api_keys (
     key_id        INT AUTO_INCREMENT PRIMARY KEY,
     key_ref       VARCHAR(40)  NOT NULL UNIQUE,

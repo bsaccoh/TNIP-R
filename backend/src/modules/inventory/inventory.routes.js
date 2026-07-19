@@ -54,16 +54,16 @@ router.get('/sites', operatorScope, asyncHandler(async (req, res) => {
   const { page, limit, offset } = paginate(req);
   const { rows, total } = await service.listSites({
     operatorId: req.scope?.operatorId ?? null,
-    region: req.query.region, technology: req.query.technology, search: req.query.search, limit, offset,
+    region: req.query.region, technology: req.query.technology, search: req.query.search, status: req.query.status, limit, offset,
   });
   return ok(res, rows, pageMeta(page, limit, total));
 }));
 
 router.get('/map', operatorScope, asyncHandler(async (req, res) =>
-  ok(res, await service.mapSites({ operatorId: req.scope?.operatorId ?? null, technology: req.query.technology }))));
+  ok(res, await service.mapSites({ operatorId: req.scope?.operatorId ?? null, technology: req.query.technology, status: req.query.status }))));
 
 router.get('/map/cells', operatorScope, asyncHandler(async (req, res) =>
-  ok(res, await service.mapCells({ operatorId: req.scope?.operatorId ?? null, technology: req.query.technology }))));
+  ok(res, await service.mapCells({ operatorId: req.scope?.operatorId ?? null, technology: req.query.technology, status: req.query.status }))));
 
 router.get('/map/regions', operatorScope, asyncHandler(async (req, res) =>
   ok(res, await service.mapRegionStats({ operatorId: req.scope?.operatorId ?? null }))));

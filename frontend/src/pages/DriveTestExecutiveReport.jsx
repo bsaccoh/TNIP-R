@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Grid, Table, TableBody, TableCell, TableHead, TableRow,
-  Alert, Stack, LinearProgress, Chip, Divider, Tabs, Tab
+  Alert, Stack, LinearProgress, Chip, Divider, Tabs, Tab,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { get } from '../api/client';
@@ -35,14 +36,21 @@ export default function DriveTestExecutiveReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
+  const [operators, setOperators] = useState([]);
+  const [selectedOp, setSelectedOp] = useState('all');
 
-  // We default to operatorId=1 (Orange) for this view based on spec
   useEffect(() => {
-    get('/drive-tests/operator-summary/1')
+    get('/operators').then(r => setOperators(r.data?.rows || r.data || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setData(null);
+    get(`/drive-tests/operator-summary/${selectedOp}`)
       .then(res => setData(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedOp]);
 
   if (loading) return <LinearProgress />;
   if (!data) return <Alert severity="error">Failed to load report</Alert>;
@@ -55,9 +63,20 @@ export default function DriveTestExecutiveReport() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', py: 4 }}>
-      <Typography variant="h4" fontWeight={900} mb={3}>
-        {operatorName} – Drive Test Summary
-      </Typography>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} mb={3} spacing={2}>
+        <Typography variant="h4" fontWeight={900}>
+          {operatorName} – Drive Test Summary
+        </Typography>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Operator</InputLabel>
+          <Select label="Operator" value={selectedOp} onChange={e => { setActiveTab(0); setSelectedOp(e.target.value); }}>
+            <MenuItem value="all">All Operators</MenuItem>
+            {operators.map(op => (
+              <MenuItem key={op.operator_id} value={op.operator_id}>{op.operator_name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Stack>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>

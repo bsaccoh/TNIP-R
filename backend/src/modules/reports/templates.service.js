@@ -83,6 +83,37 @@ async function fetchMonthlyQoS({ from, to, operatorId }) {
      GROUP BY o.operator_name, m.kpi_name, m.technology, t.threshold_value, t.direction, t.unit
      ORDER BY o.operator_name, m.kpi_name`, { from, to, operatorId }).catch(() => []);
 
+  // Drive Test Metrics
+  const dtRows = await query(`
+    SELECT o.operator_name, 'DT Coverage (RSRP)' AS kpi_name, dt.technology,
+           AVG(s.rsrp) AS avg_val, MIN(s.rsrp) AS min_val, MAX(s.rsrp) AS max_val,
+           COUNT(s.sample_id) AS measurements,
+           -100 AS threshold_value, 'above' AS direction, 'dBm' AS unit,
+           SUM(CASE WHEN s.rsrp >= -100 THEN 1 ELSE 0 END) AS passing,
+           COUNT(s.sample_id) AS total
+      FROM drive_tests dt
+      JOIN operators o ON o.operator_id = dt.operator_id
+      JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
+     WHERE dt.test_date BETWEEN :from AND :to ${opFilter}
+     GROUP BY o.operator_name, dt.technology`, { from, to, operatorId }).catch(() => []);
+
+  // Inventory Metrics
+  const invRows = await query(`
+    SELECT o.operator_name, 'Active Network Sites' AS kpi_name, 'All' AS technology,
+           SUM(CASE WHEN s.status = 'ACTIVE' THEN 1 ELSE 0 END) AS avg_val,
+           SUM(CASE WHEN s.status = 'ACTIVE' THEN 1 ELSE 0 END) AS min_val,
+           SUM(CASE WHEN s.status = 'ACTIVE' THEN 1 ELSE 0 END) AS max_val,
+           COUNT(s.site_id) AS measurements,
+           0 AS threshold_value, 'above' AS direction, 'Sites' AS unit,
+           SUM(CASE WHEN s.status = 'ACTIVE' THEN 1 ELSE 0 END) AS passing,
+           COUNT(s.site_id) AS total
+      FROM sites s
+      JOIN operators o ON o.operator_id = s.operator_id
+     WHERE s.deleted_at IS NULL ${opFilter.replace('m.operator_id', 's.operator_id')}
+     GROUP BY o.operator_name`, { from, to, operatorId }).catch(() => []);
+
+  kpiRows.push(...dtRows, ...invRows);
+
   const operators = await query(`SELECT operator_name FROM operators WHERE status='ACTIVE' ORDER BY operator_name`).catch(() => []);
 
   // Summary stats

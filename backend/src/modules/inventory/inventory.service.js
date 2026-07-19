@@ -142,12 +142,13 @@ export async function importGeoDimension(operatorId, buffer) {
 }
 
 // ─── Read models for inventory UI / coverage map ───────────────────────────
-export async function listSites({ operatorId, region, technology, search, limit, offset }) {
+export async function listSites({ operatorId, region, technology, search, status, limit, offset }) {
   const where = ['s.deleted_at IS NULL'];
   const params = { limit, offset };
   if (operatorId != null) { where.push('s.operator_id = :op'); params.op = operatorId; }
   if (region) { where.push('r.name = :region'); params.region = region; }
   if (search) { where.push('(s.site_code LIKE :s OR s.site_name LIKE :s)'); params.s = `%${search}%`; }
+  if (status) { where.push('s.status = :status'); params.status = status; }
   const whereSql = `WHERE ${where.join(' AND ')}`;
   const rows = await query(
     `SELECT s.site_id, s.operator_id, o.operator_name, s.site_code, s.site_name,
@@ -164,11 +165,12 @@ export async function listSites({ operatorId, region, technology, search, limit,
 }
 
 /** Coordinates for the national coverage map (operator layer + tech filter). */
-export async function mapSites({ operatorId, technology }) {
+export async function mapSites({ operatorId, technology, status }) {
   const where = ['s.deleted_at IS NULL', 's.latitude IS NOT NULL'];
   const params = {};
   if (operatorId != null) { where.push('s.operator_id = :op'); params.op = operatorId; }
   if (technology) { where.push('s.technologies LIKE :t'); params.t = `%${technology}%`; }
+  if (status) { where.push('s.status = :status'); params.status = status; }
   return query(
     `SELECT s.site_id, s.operator_id, s.site_code, s.site_name, s.latitude, s.longitude,
             s.technologies, s.status, r.name AS region
@@ -177,11 +179,12 @@ export async function mapSites({ operatorId, technology }) {
 }
 
 /** Cell-level coordinates for the coverage map. */
-export async function mapCells({ operatorId, technology }) {
+export async function mapCells({ operatorId, technology, status }) {
   const where = ['c.deleted_at IS NULL', '(c.latitude IS NOT NULL OR s.latitude IS NOT NULL)'];
   const params = {};
   if (operatorId != null) { where.push('c.operator_id = :op'); params.op = operatorId; }
   if (technology) { where.push('t.tech_key = :t'); params.t = technology; }
+  if (status) { where.push('s.status = :status'); params.status = status; }
   return query(
     `SELECT c.cell_id, c.operator_id, c.cell_code, c.cell_name,
             COALESCE(c.latitude, s.latitude) AS latitude,

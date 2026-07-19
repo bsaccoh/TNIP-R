@@ -33,6 +33,7 @@ export default function Inventory() {
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('');
 
   const loadStats = () =>
     get('/inventory/stats').then((r) => setStats(r.data)).catch(() => setStats({}));
@@ -43,6 +44,7 @@ export default function Inventory() {
         page: page + 1, limit: 10,
         search: search || undefined,
         operatorId: operatorId || undefined,
+        status: statusFilter || undefined,
       })
         .then((r) => { setSites(r.data); setTotal(r.meta?.total || 0); })
         .catch(() => setSites([]));
@@ -55,7 +57,7 @@ export default function Inventory() {
     if (!isRegulator) return;
     get('/operators').then((r) => setOps(r.data.data ?? r.data ?? [])).catch(() => {});
   }, [isRegulator]);
-  useEffect(loadSites, [page, search, operatorId]);
+  useEffect(loadSites, [page, search, operatorId, statusFilter]);
 
   const handleImported = () => {
     loadStats();
@@ -126,13 +128,25 @@ export default function Inventory() {
                 </Select>
               </FormControl>
             )}
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Status</InputLabel>
+              <Select label="Status" value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
+                <MenuItem value="">All statuses</MenuItem>
+                <MenuItem value="ACTIVE">Active</MenuItem>
+                <MenuItem value="INACTIVE">Inactive</MenuItem>
+                <MenuItem value="PLANNED">Planned</MenuItem>
+                <MenuItem value="DEGRADED">Degraded</MenuItem>
+                <MenuItem value="DOWN">Down</MenuItem>
+              </Select>
+            </FormControl>
             <Button size="small" startIcon={<RefreshIcon />} onClick={reload}>Refresh</Button>
           </Stack>
 
           {!sites ? <Loading /> : !sites.length ? (
             <EmptyState
               message="No sites loaded yet."
-              hint='Click "Import Geo-Dimension" above to load the Orange Geo-Dimension Excel workbook (649 sites, 24 500+ cells).'
+              hint='Click "Import Geo-Dimension" above to load an operator Geo-Dimension Excel workbook.'
             />
           ) : (
             <>
@@ -387,9 +401,9 @@ function ImportGeoDimDialog({ open, onClose, onImported }) {
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <Alert severity="info">
-            Upload the <strong>Geo-Dimension_Newsites_Upgrade_2026_V1.xlsx</strong> workbook
-            (or any Huawei Geo-Dim export). Contains two sheets:
-            <em> OSL_Physical Sites</em> (649 sites) and <em>GEO-DIM 2G_3G_4G_5G</em> (24 500+ cells).
+            Upload the operator's <strong>Geo-Dimension</strong> workbook.
+            It should contain two sheets matching the format:
+            <em> OSL_Physical Sites</em> and <em>GEO-DIM 2G_3G_4G_5G</em>.
           </Alert>
           {error && <Alert severity="error">{error}</Alert>}
           {result ? (

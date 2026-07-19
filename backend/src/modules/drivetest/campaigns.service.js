@@ -1,7 +1,7 @@
 import { query } from '../../config/db.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-async function ensureTables() {
+export async function ensureTables() {
   await query(`CREATE TABLE IF NOT EXISTS dt_campaigns (
     campaign_id     INT AUTO_INCREMENT PRIMARY KEY,
     campaign_ref    VARCHAR(40)  NOT NULL UNIQUE,
