@@ -1298,7 +1298,7 @@ export default function DriveTestCluster() {
                         <div style={{ fontSize: 12 }}>
                           <strong>Worst Coverage Area</strong><br />
                           Location: {loc}<br />
-                          Average: {a.avgVal} {primary?.unit}<br />
+                          Average: {a.avgVal} {cfg?.primary?.unit}<br />
                           Samples: {a.samples}
                         </div>
                       </Popup>
