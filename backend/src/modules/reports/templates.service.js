@@ -42,6 +42,14 @@ export const TEMPLATES = [
     icon:        'Route',
     category:    'Drive Test',
   },
+  {
+    id:          'operator-qoe-benchmark',
+    title:       'Operator QoE Benchmarking Report',
+    description: 'Detailed analysis of Throughput, Voice MOS, and Call Setup Time (RTT) benchmarked by operator, administrative region, and national global baselines.',
+    sections:    ['Overview Matrix', 'Regional Analysis Slices', 'Regulatory Target Scorecard'],
+    icon:        'SignalCellularAlt',
+    category:    'QoS',
+  },
 ];
 
 /* ── Data fetchers per template ──────────────────────────────────────────── */
@@ -56,6 +64,7 @@ export async function fetchTemplateData(templateId, { from, to, operatorId } = {
     case 'annual-compliance': return fetchAnnualCompliance(p);
     case 'consumer-qoe':     return fetchConsumerQoE(p);
     case 'drive-test-summary': return fetchDriveTest(p);
+    case 'operator-qoe-benchmark': return fetchQoEBenchmark(p);
     default: throw new Error(`Unknown template: ${templateId}`);
   }
 }
@@ -331,5 +340,82 @@ async function fetchDriveTest({ from, to, operatorId }) {
       rsrpCompliance: overallStats?.total > 0
         ? +((overallStats.rsrp_pass / overallStats.total) * 100).toFixed(1) : null,
     },
+  };
+}
+
+/* ── QoE Benchmark ────────────────────────────────────────────────────────── */
+async function fetchQoEBenchmark({ from, to, operatorId }) {
+  const opFilter = operatorId ? 'AND dt.operator_id = :operatorId' : '';
+
+  const global = await query(`
+    SELECT ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
+           ROUND(AVG(s.mos), 2)           AS avg_mos,
+           ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt
+      FROM drive_tests dt
+      LEFT JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
+     WHERE dt.test_date BETWEEN :from AND :to AND dt.status = 'COMPLETED'`,
+    { from, to }).catch(() => [{}]);
+
+  const globalStats = global[0] || { avg_dl: null, avg_mos: null, avg_rtt: null };
+
+  const operators = await query(`
+    SELECT o.operator_name,
+           ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
+           ROUND(AVG(s.mos), 2)           AS avg_mos,
+           ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt,
+           COUNT(s.sample_id)             AS sample_count
+      FROM drive_tests dt
+      JOIN operators o ON o.operator_id = dt.operator_id
+      LEFT JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
+     WHERE dt.test_date BETWEEN :from AND :to AND dt.status = 'COMPLETED' ${opFilter}
+     GROUP BY o.operator_id, o.operator_name
+     ORDER BY avg_dl DESC`,
+    { from, to, operatorId }).catch(() => []);
+
+  const regions = await query(`
+    SELECT 
+      CASE 
+        WHEN s.latitude >= 8.3 AND s.latitude <= 8.6 AND s.longitude >= -13.4 AND s.longitude <= -13.0 THEN 'Western Area'
+        WHEN s.latitude > 8.6 THEN 'Northern'
+        WHEN s.latitude < 8.3 AND s.longitude <= -11.5 THEN 'Southern'
+        WHEN s.latitude < 9.0 AND s.longitude > -11.5 THEN 'Eastern'
+        ELSE 'Other'
+      END AS region_name,
+      o.operator_name,
+      ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
+      ROUND(AVG(s.mos), 2)           AS avg_mos,
+      ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt,
+      COUNT(s.sample_id)             AS sample_count
+    FROM drive_tests dt
+    JOIN operators o ON o.operator_id = dt.operator_id
+    JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
+    WHERE dt.test_date BETWEEN :from AND :to AND dt.status = 'COMPLETED' ${opFilter}
+    GROUP BY region_name, o.operator_id, o.operator_name
+    HAVING region_name != 'Other'
+    ORDER BY region_name, avg_dl DESC`,
+    { from, to, operatorId }).catch(() => []);
+
+  return {
+    from, to,
+    global: {
+      avgDl: globalStats.avg_dl ? Number(globalStats.avg_dl) : null,
+      avgMos: globalStats.avg_mos ? Number(globalStats.avg_mos) : null,
+      avgRtt: globalStats.avg_rtt ? Number(globalStats.avg_rtt) : null
+    },
+    operators: operators.map((o) => ({
+      name: o.operator_name,
+      avgDl: o.avg_dl ? Number(o.avg_dl) : null,
+      avgMos: o.avg_mos ? Number(o.avg_mos) : null,
+      avgRtt: o.avg_rtt ? Number(o.avg_rtt) : null,
+      samples: Number(o.sample_count)
+    })),
+    regions: regions.map((r) => ({
+      region: r.region_name,
+      operator: r.operator_name,
+      avgDl: r.avg_dl ? Number(r.avg_dl) : null,
+      avgMos: r.avg_mos ? Number(r.avg_mos) : null,
+      avgRtt: r.avg_rtt ? Number(r.avg_rtt) : null,
+      samples: Number(r.sample_count)
+    }))
   };
 }

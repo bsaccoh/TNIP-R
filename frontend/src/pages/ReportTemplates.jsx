@@ -312,6 +312,35 @@ function buildHtml(template, data, config) {
     ));
   }
 
+  if (template.id === 'operator-qoe-benchmark') {
+    const gl = data.global || {};
+    body += section('National Baseline Overview', kv([
+      ['Avg DL Throughput', gl.avgDl != null ? `${(gl.avgDl / 1000).toFixed(2)} Mbps` : '—'],
+      ['Avg Voice MOS',    gl.avgMos != null ? `${gl.avgMos.toFixed(2)} / 5.0` : '—'],
+      ['Avg Call Setup Time (RTT)', gl.avgRtt != null ? `${gl.avgRtt} ms` : '—'],
+    ]));
+
+    body += section('Operator Benchmarking Matrix', table(
+      ['Operator', 'Samples', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
+      (data.operators || []).map((o) => [
+        o.name, o.samples.toLocaleString(),
+        o.avgDl != null ? `${(o.avgDl / 1000).toFixed(2)} Mbps` : '—',
+        o.avgMos != null ? `${o.avgMos.toFixed(2)} / 5.0` : '—',
+        o.avgRtt != null ? `${o.avgRtt} ms` : '—',
+      ]),
+    ));
+
+    body += section('Regional QoS Analysis Slices', table(
+      ['Region', 'Operator', 'Samples', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
+      (data.regions || []).map((r) => [
+        r.region, r.operator, r.samples.toLocaleString(),
+        r.avgDl != null ? `${(r.avgDl / 1000).toFixed(2)} Mbps` : '—',
+        r.avgMos != null ? `${r.avgMos.toFixed(2)} / 5.0` : '—',
+        r.avgRtt != null ? `${r.avgRtt} ms` : '—',
+      ]),
+    ));
+  }
+
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>${template.title}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -713,6 +742,91 @@ function DataPreview({ template, data }) {
           </Stack>
         ) : (
           <Alert severity="info">No drive test campaigns found for the selected period.</Alert>
+        )}
+      </Stack>
+    );
+  }
+
+  if (t === 'operator-qoe-benchmark') {
+    const gl = data.global || {};
+    return (
+      <Stack spacing={2}>
+        <Paper elevation={0} sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>National Baselines (Global)</Typography>
+          <Stack direction="row" spacing={3}>
+            <Box sx={{ textAlign: 'center', flex: 1 }}>
+              <Typography variant="h5" fontWeight={700} color="primary">
+                {gl.avgDl != null ? `${(gl.avgDl / 1000).toFixed(2)} Mbps` : '—'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">Avg DL Speed</Typography>
+            </Box>
+            <Divider orientation="vertical" flexItem />
+            <Box sx={{ textAlign: 'center', flex: 1 }}>
+              <Typography variant="h5" fontWeight={700} color="success.main">
+                {gl.avgMos != null ? `${gl.avgMos.toFixed(2)}` : '—'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">Voice MOS</Typography>
+            </Box>
+            <Divider orientation="vertical" flexItem />
+            <Box sx={{ textAlign: 'center', flex: 1 }}>
+              <Typography variant="h5" fontWeight={700} color="warning.main">
+                {gl.avgRtt != null ? `${gl.avgRtt} ms` : '—'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">Setup Latency</Typography>
+            </Box>
+          </Stack>
+        </Paper>
+
+        {data.operators?.length > 0 && (
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              Operator Benchmarks
+            </Typography>
+            <Stack spacing={1}>
+              {data.operators.map((o, i) => (
+                <Paper key={i} elevation={0} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>{o.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {o.samples.toLocaleString()} samples · Latency: {o.avgRtt != null ? `${o.avgRtt} ms` : '—'}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Chip size="small" label={o.avgDl != null ? `${(o.avgDl / 1000).toFixed(2)} Mbps` : '—'} color="primary" />
+                      <Chip size="small" label={o.avgMos != null ? `MOS: ${o.avgMos.toFixed(2)}` : '—'} color={o.avgMos >= 3.5 ? 'success' : 'warning'} />
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        {data.regions?.length > 0 && (
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              Regional Performance Averages
+            </Typography>
+            <Grid container spacing={1}>
+              {data.regions.slice(0, 8).map((r, i) => (
+                <Grid item xs={6} key={i}>
+                  <Paper elevation={0} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" fontWeight={700}>{r.region}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">{r.operator}</Typography>
+                    <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="primary.main" fontWeight={600}>
+                        {r.avgDl != null ? `${(r.avgDl / 1000).toFixed(1)} Mbps` : '—'}
+                      </Typography>
+                      <Typography variant="caption" color="success.main" fontWeight={600}>
+                        {r.avgMos != null ? `MOS ${r.avgMos.toFixed(1)}` : '—'}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         )}
       </Stack>
     );
