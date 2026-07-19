@@ -102,13 +102,7 @@ function FlyTo({ center, zoom }) {
   return null;
 }
 
-// ── Zoom tracker — reports current zoom level to parent ──────────────────────
-function ZoomTracker({ onZoom }) {
-  const map = useMap();
-  useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
-  useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
-  return null;
-}
+
 
 // ── Percentile helpers ───────────────────────────────────────────────────────
 function calcPercentiles(arr, pcts = [5, 25, 50, 90, 95]) {
@@ -1025,78 +1019,8 @@ export default function DriveTestCluster() {
   const [thresholdCfg, setThresholdCfg] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [invSites, setInvSites] = useState([]);
-  const [mapZoom, setMapZoom] = useState(13);
-  const [areaNames, setAreaNames] = useState({});
 
-  // cfg must be computed before the Nominatim useEffect that depends on screenProblemAreas
   const cfg = thresholdCfg?.[selectedTech] || thresholdCfg?.['4G'];
-
-  const screenProblemAreas = useMemo(() => {
-    if (!samples.length || !cfg?.primary) return [];
-
-    const opSamples = selectedOps.length > 0
-      ? samples.filter((s) => {
-          const op = operators.find((o) => o.operator_name === s.operator_name);
-          return op ? selectedOps.includes(op.operator_id) : true;
-        })
-      : samples;
-
-    const areas = findProblemAreas(opSamples, cfg.primary);
-
-    areas.forEach((a) => {
-      const clusterSamples = opSamples.filter(
-        (s) => Math.abs(Number(s.latitude) - Number(a.lat)) < 0.002 &&
-               Math.abs(Number(s.longitude) - Number(a.lon)) < 0.002
-      );
-      const opName = clusterSamples[0]?.operator_name ||
-        samples.find((s) => s.latitude === a.lat || s.longitude === a.lon)?.operator_name || '';
-      a._opName = opName;
-
-      const isOrange = /orange/i.test(opName);
-      if (isOrange) {
-        const opId = operators.find((op) => op.operator_name === opName)?.operator_id;
-        const opInv = opId ? invSites.filter((s) => s.operator_id === opId) : [];
-        a.locationName = nearestSiteName(a.lat, a.lon, opInv, 30) || '';
-      } else {
-        a.locationName = `${Number(a.lat).toFixed(5)}°N, ${Math.abs(Number(a.lon)).toFixed(5)}°W`;
-      }
-    });
-    return areas;
-  }, [samples, cfg, selectedOps, invSites, operators]);
-
-  // Reverse-geocode problem areas via Nominatim (OSM) to get street/area names.
-  // Rate-limited to 1 req/s; results cached in areaNames state keyed by "lat,lon".
-  useEffect(() => {
-    if (!screenProblemAreas.length) return;
-    let cancelled = false;
-    const toFetch = screenProblemAreas.filter((a) => {
-      const k = `${a.lat},${a.lon}`;
-      return !areaNames[k] && /orange/i.test(a._opName || '');
-    });
-    if (!toFetch.length) return;
-
-    (async () => {
-      const batch = {};
-      for (const a of toFetch) {
-        if (cancelled) break;
-        const k = `${a.lat},${a.lon}`;
-        try {
-          await new Promise((r) => setTimeout(r, 300));
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${a.lat}&lon=${a.lon}&zoom=17`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const data = await res.json();
-          const addr = data.address || {};
-          batch[k] = addr.suburb || addr.neighbourhood || addr.quarter
-            || addr.road || addr.village || addr.town
-            || data.display_name?.split(',')[0] || null;
-        } catch { batch[k] = null; }
-      }
-      if (!cancelled) setAreaNames((prev) => ({ ...prev, ...batch }));
-    })();
-    return () => { cancelled = true; };
-  }, [screenProblemAreas]); // eslint-disable-line
 
   useEffect(() => {
     get('/drive-tests').then((r) => setAllTests(r.data)).catch(() => setAllTests([]));
@@ -1335,26 +1259,13 @@ export default function DriveTestCluster() {
           {/* Map */}
           <Card sx={{ height: 520 }}>
             <CardContent sx={{ height: '100%', p: '0 !important', position: 'relative' }}>
-              {/* Strip the default Leaflet tooltip bubble from our area labels */}
-              <style>{`
-                .bare-label.leaflet-tooltip {
-                  background: transparent !important;
-                  border: none !important;
-                  box-shadow: none !important;
-                  padding: 0 !important;
-                }
-                .bare-label.leaflet-tooltip::before {
-                  display: none !important;
-                }
-              `}</style>
               <MapContainer center={[8.4, -11.8]} zoom={13} style={{ height: '100%', width: '100%' }}>
-                <ZoomTracker onZoom={setMapZoom} />
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
                   url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
                 {flyTarget && <FlyTo center={flyTarget} zoom={14} />}
-
+ 
                 {samples.map((s) => {
                   const color = metricCfg ? binColor(s[metricCfg.key], metricCfg) : '#888';
                   return (
@@ -1371,44 +1282,6 @@ export default function DriveTestCluster() {
                           <span style={{ color: '#888', fontSize: 11 }}>
                             {Number(s.latitude).toFixed(5)}, {Number(s.longitude).toFixed(5)}
                           </span>
-                        </div>
-                      </Popup>
-                    </CircleMarker>
-                  );
-                })}
-
-                {screenProblemAreas.map((a, i) => {
-                  const areaKey = `${a.lat},${a.lon}`;
-                  const isNoInv = /qcell|africell/i.test(a._opName || '');
-                  // Area label: Nominatim name → site name → coordinates
-                  const areaLabel = (!isNoInv && areaNames[areaKey])
-                    || (!isNoInv && a.locationName && a.locationName !== '—' ? a.locationName : null)
-                    || `${Number(a.lat).toFixed(4)}°N, ${Math.abs(Number(a.lon)).toFixed(4)}°W`;
-                  // Popup location text
-                  const popupLoc = areaLabel;
-                  return (
-                    <CircleMarker
-                      key={`screen-prob-${i}`}
-                      center={[Number(a.lat), Number(a.lon)]}
-                      radius={8}
-                      pathOptions={{ color: '#d32f2f', fillColor: '#d32f2f', fillOpacity: 0.4, weight: 1.5, dashArray: '3,3' }}
-                    >
-                      {/* Area name label — only shown when zoomed in (≥ 15) */}
-                      {mapZoom >= 15 && (
-                        <LeafletTooltip permanent direction="top" offset={[0, -8]} className="bare-label">
-                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#b71c1c', textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff' }}>
-                            ⚠ {areaLabel}
-                          </span>
-                        </LeafletTooltip>
-                      )}
-                      <Popup>
-                        <div style={{ fontSize: 12 }}>
-                          <strong>Worst Coverage Area</strong><br />
-                          {areaNames[areaKey] && <><em>{areaNames[areaKey]}</em><br /></>}
-                          Location: {popupLoc}<br />
-                          Operator: {a._opName || '—'}<br />
-                          Average: {a.avgVal} {cfg?.primary?.unit}<br />
-                          Samples: {a.samples}
                         </div>
                       </Popup>
                     </CircleMarker>
