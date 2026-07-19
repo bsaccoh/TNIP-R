@@ -272,7 +272,7 @@ function DistributionTable({ samples, tech, mapMode, techCfg }) {
 }
 
 // ── Auto remarks ─────────────────────────────────────────────────────────────
-function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites = [] }) {
+function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites = [], operators = [] }) {
   const cfg = techCfg;
   const primary = cfg?.primary;
   const secondary = cfg?.secondary;
@@ -300,9 +300,13 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites
   let problemAreaText = '';
   if (!primaryMet) {
     const problemAreas = findProblemAreas(samples, primary);
-    const filteredInv = invSites.filter((s) => operatorNames.includes(s.operator_name));
+    const opIds = operatorNames.map((name) => {
+      const found = operators.find((op) => op.operator_name.toLowerCase() === name.toLowerCase());
+      return found ? found.operator_id : null;
+    }).filter(Boolean);
+    const filteredInv = invSites.filter((s) => opIds.includes(s.operator_id));
     problemAreas.forEach((a) => {
-      a.locationName = nearestSiteName(a.lat, a.lon, filteredInv) || '—';
+      a.locationName = nearestSiteName(a.lat, a.lon, filteredInv, 50) || '';
     });
 
     if (problemAreas.length > 0) {
@@ -539,7 +543,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function nearestSiteName(lat, lon, sites, maxKm = 5) {
+function nearestSiteName(lat, lon, sites, maxKm = 50) {
   let best = null, bestDist = Infinity;
   for (const s of sites) {
     if (!s.latitude || !s.longitude) continue;
@@ -1362,6 +1366,7 @@ export default function DriveTestCluster() {
                           operatorNames={[opName]}
                           techCfg={cfg}
                           invSites={invSites}
+                          operators={operators}
                         />
                       </CardContent>
                     </Card>
