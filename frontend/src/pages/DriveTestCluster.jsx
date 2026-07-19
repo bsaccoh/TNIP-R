@@ -764,37 +764,9 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         </div>`;
 
       const problemTable = problemAreas.length ? `
-        <div style="margin-top:10px;">
-          <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#c0392b;">Top Problem Areas — ${cfg.primary.label}</div>
-          <div style="display:flex;gap:12px;margin-bottom:8px;">
-            <div style="flex:1;">
-              <table style="border-collapse:collapse;width:100%;font-size:10px;">
-                <thead><tr>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;">#</th>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;">Location Name</th>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;">Latitude</th>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;">Longitude</th>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;text-align:right;">Avg ${cfg.primary.label}</th>
-                  <th style="background:#c0392b;color:#fff;padding:4px 6px;text-align:right;">Samples</th>
-                </tr></thead>
-                <tbody>
-                  ${problemAreas.map((a, i) => `<tr style="background:${i % 2 === 0 ? '#fff5f5' : '#fff'}">
-                    <td style="padding:3px 6px;border:1px solid #ddd;">${i + 1}</td>
-                    <td style="padding:3px 6px;border:1px solid #ddd;">${a.locationName || '—'}</td>
-                    <td style="padding:3px 6px;border:1px solid #ddd;">${a.lat}</td>
-                    <td style="padding:3px 6px;border:1px solid #ddd;">${a.lon}</td>
-                    <td style="padding:3px 6px;border:1px solid #ddd;text-align:right;">
-                      <span style="color:${a.color};font-weight:bold;">${a.avgVal} ${cfg.primary.unit || ''}</span>
-                    </td>
-                    <td style="padding:3px 6px;border:1px solid #ddd;text-align:right;">${a.samples}</td>
-                  </tr>`).join('')}
-                </tbody>
-              </table>
-            </div>
-            <div style="flex:1;">
-               <div id="map_${safeKey}_prob" style="height:100%;min-height:180px;border:1px solid #ccc;border-radius:3px;"></div>
-            </div>
-          </div>
+        <div style="margin-top:10px;page-break-inside:avoid;">
+          <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#c0392b;">Top Problem Areas Map — ${cfg.primary.label}</div>
+          <div id="map_${safeKey}_prob" style="height:200px;border:1px solid #ccc;border-radius:3px;"></div>
         </div>` : '';
 
       const remarks = buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, deadZones.length, problemAreas);
