@@ -276,7 +276,7 @@ function DistributionTable({ samples, tech, mapMode, techCfg }) {
 // ── Auto remarks helpers ─────────────────────────────────────────────────────
 export function getRemarksAnalysis(primaryMetricKey, isOrange, primaryPct) {
   const pPctVal = Number(primaryPct);
-  if (pPctVal >= 70) {
+  if (pPctVal >= 80) {
     return {
       condition: "Satisfactory overall coverage conditions.",
       cause: "Adequate signal propagation from serving base stations across the cluster.",
@@ -317,7 +317,7 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites
 
   const { pass: primaryPass, total: primaryTotal } = passCount(samples, primary);
   const primaryPct = primaryTotal ? ((primaryPass / primaryTotal) * 100).toFixed(1) : '?';
-  const primaryMet = Number(primaryPct) >= 70;
+  const primaryMet = Number(primaryPct) >= 80;
 
   let secText = '';
   if (secondary) {
@@ -584,7 +584,7 @@ function buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, dea
   const analysis = getRemarksAnalysis(cfg.primary.key, isOrange, pPct);
 
   let analysisRemark = '';
-  if (pNum < 70) {
+  if (pNum < 80) {
     analysisRemark = `
       <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #ccc;font-size:9px;">
         <p style="margin:0 0 3px 0;"><strong>Condition:</strong> ${analysis.condition}</p>
