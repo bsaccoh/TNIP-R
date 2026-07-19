@@ -273,6 +273,40 @@ function DistributionTable({ samples, tech, mapMode, techCfg }) {
   );
 }
 
+// ── Auto remarks helpers ─────────────────────────────────────────────────────
+export function getRemarksAnalysis(primaryMetricKey, isOrange, primaryPct) {
+  const pPctVal = Number(primaryPct);
+  if (pPctVal >= 70) {
+    return {
+      condition: "Satisfactory overall coverage conditions.",
+      cause: "Adequate signal propagation from serving base stations across the cluster.",
+      recommendation: "Maintain routine site maintenance and monitor traffic growth to preempt congestion."
+    };
+  }
+
+  const isQuality = /sinr|ecno|ec\/no/i.test(primaryMetricKey || '');
+  
+  let condition = "";
+  let cause = "";
+  let recommendation = "";
+
+  if (isQuality) {
+    condition = "Degraded signal quality and high interference levels.";
+    cause = "Likely due to pilot pollution (overlapping cell footprints) or co-channel interference from adjacent cell sites operating on the same frequencies.";
+    recommendation = "Execute physical optimization (antenna tilt/azimuth adjustments) to reduce overlap, perform frequency audit/plan review, or enable dynamic interference coordination features.";
+  } else {
+    condition = "Weak signal propagation and poor coverage penetration.";
+    cause = isOrange 
+      ? "Likely caused by excessive distance from serving site towers or localized obstruction (dense foliage/terrain masking) around the target problem areas."
+      : "Likely due to lack of local serving site infrastructure or heavy propagation loss in the target coordinates.";
+    recommendation = isOrange
+      ? "Recommend adjusting the mechanical/electrical down-tilt of serving antennas to target coverage gaps, or deploy a local repeater/micro-site to improve signal levels."
+      : "Recommend planning new site acquisitions (additional nodes/towers) or repeater deployment to cover the blind spots.";
+  }
+
+  return { condition, cause, recommendation };
+}
+
 // ── Auto remarks ─────────────────────────────────────────────────────────────
 function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites = [], operators = [] }) {
   const cfg = techCfg;
@@ -334,6 +368,9 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites
     problemAreaText = ' Coverage meets regulatory threshold.';
   }
 
+  const isOrange = operatorNames.some(name => /orange/i.test(name));
+  const analysis = getRemarksAnalysis(primary.key, isOrange, primaryPct);
+
   return (
     <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 2, mt: 1 }}>
       <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Remarks</Typography>
@@ -344,6 +381,19 @@ function RemarksPanel({ samples, tech, cluster, operatorNames, techCfg, invSites
         {secText}
         {' '}{primary.passLabel} is required for quality connection.
       </Typography>
+      {!primaryMet && (
+        <Stack spacing={1} sx={{ mt: 1.5, borderTop: '1px dashed', borderColor: 'divider', pt: 1.5 }}>
+          <Typography variant="caption" display="block">
+            <strong>Condition:</strong> {analysis.condition}
+          </Typography>
+          <Typography variant="caption" display="block">
+            <strong>Probable Cause:</strong> {analysis.cause}
+          </Typography>
+          <Typography variant="caption" display="block">
+            <strong>Recommendation:</strong> <span style={{ color: '#b71c1c', fontWeight: 600 }}>{analysis.recommendation}</span>
+          </Typography>
+        </Stack>
+      )}
     </Box>
   );
 }
@@ -530,6 +580,19 @@ function buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, dea
     paRemark = ` Signal improvements are needed at: <strong>${list}</strong>.`;
   }
 
+  const isOrange = /orange/i.test(opName);
+  const analysis = getRemarksAnalysis(cfg.primary.key, isOrange, pPct);
+
+  let analysisRemark = '';
+  if (pNum < 70) {
+    analysisRemark = `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #ccc;font-size:9px;">
+        <p style="margin:0 0 3px 0;"><strong>Condition:</strong> ${analysis.condition}</p>
+        <p style="margin:0 0 3px 0;"><strong>Probable Cause:</strong> ${analysis.cause}</p>
+        <p style="margin:0;color:#c0392b;"><strong>Recommendation:</strong> <strong>${analysis.recommendation}</strong></p>
+      </div>`;
+  }
+
   return `
     <div style="margin-top:10px;padding:8px 12px;border-left:4px solid ${statusColor};background:#fafafa;font-size:10px;color:#222;">
       <div style="font-weight:bold;font-size:11px;color:${statusColor};margin-bottom:5px;">
@@ -537,7 +600,8 @@ function buildRemarks(opName, tech, cfg, pPct, pPass, pTotal, sPct, secPass, dea
       </div>
       <p style="margin:0 0 4px 0;">${lead}${secRemark}</p>
       <p style="margin:0 0 4px 0;">${dzRemark}${paRemark}</p>
-      <p style="margin:0;color:#555;">
+      ${analysisRemark}
+      <p style="margin:8px 0 0 0;color:#555;font-size:8px;">
         <em>Note: Measurements are based on drive test samples collected along the defined cluster route.
         Results reflect point-in-time signal conditions and may vary with network load, time of day, and environmental factors.</em>
       </p>
