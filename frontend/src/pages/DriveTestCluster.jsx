@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Tooltip as LeafletTooltip } from 'react-leaflet';
 import {
   Box, Card, CardContent, Typography, Stack, Grid, Chip, Alert,
   FormControl, InputLabel, Select, MenuItem, FormGroup, FormControlLabel,
@@ -862,6 +862,17 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
     .cover-bar .sub { font-size: 11px; opacity: 0.85; margin-top: 4px; }
     .geo-bar { background: #0d3c7a; color: #cfe2ff; font-size: 10px; padding: 5px 16px; margin-bottom: 14px; border-radius: 0 0 3px 3px; display: flex; gap: 24px; }
     .geo-bar span { display: flex; align-items: center; gap: 5px; }
+    .permanent-tooltip {
+      background: #fff !important;
+      border: 1px solid #c0392b !important;
+      border-radius: 3px !important;
+      color: #222 !important;
+      font-weight: bold !important;
+      font-size: 8px !important;
+      padding: 2px 5px !important;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.2) !important;
+      white-space: nowrap !important;
+    }
   </style>
 </head>
 <body>
@@ -887,7 +898,7 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
     var TILE = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
     var ATTR = '&copy; OpenStreetMap &copy; CARTO';
 
-    function initMap(divId, markers, defaultRadius) {
+    function initMap(divId, markers, defaultRadius, isPermanent) {
       var el = document.getElementById(divId);
       if (!el || !markers || !markers.length) return;
       var lats = markers.map(function(m){ return parseFloat(m[0]); });
@@ -903,7 +914,13 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
         var cm = L.circleMarker([lat, lon], {
           radius: r, color: mk[2], fillColor: mk[2], fillOpacity: 0.85, weight: 0.5, stroke: true
         });
-        if (tip) cm.bindTooltip(tip, { sticky: true });
+        if (tip) {
+          if (isPermanent) {
+            cm.bindTooltip(tip, { permanent: true, direction: 'top', className: 'permanent-tooltip' });
+          } else {
+            cm.bindTooltip(tip, { sticky: true });
+          }
+        }
         cm.addTo(map);
         bounds.push([lat, lon]);
       }
@@ -913,16 +930,16 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
 
     window.addEventListener('load', function() {
       Object.keys(__mapData).forEach(function(key) {
-        initMap('map_' + key + '_p', __mapData[key].primary, 3);
+        initMap('map_' + key + '_p', __mapData[key].primary, 3, false);
         if (__mapData[key].secondary && __mapData[key].secondary.length) {
-          initMap('map_' + key + '_s', __mapData[key].secondary, 3);
+          initMap('map_' + key + '_s', __mapData[key].secondary, 3, false);
         }
         if (__mapData[key].problems && __mapData[key].problems.length) {
-          initMap('map_' + key + '_prob', __mapData[key].problems, 8);
+          initMap('map_' + key + '_prob', __mapData[key].problems, 8, true);
         }
       });
       if (__dzMarkers && __dzMarkers.length) {
-        initMap('map_deadzones', __dzMarkers, 8);
+        initMap('map_deadzones', __dzMarkers, 8, true);
       }
     });
   <\/script>
@@ -1049,6 +1066,29 @@ export default function DriveTestCluster() {
     const names = new Set(samples.map((s) => s.operator_name).filter(Boolean));
     return [...names];
   }, [samples]);
+
+  const screenProblemAreas = useMemo(() => {
+    if (!samples.length || !cfg?.primary) return [];
+    
+    // Group samples by operator
+    const opSamples = selectedOps.length > 0 
+      ? samples.filter((s) => {
+          const op = operators.find((o) => o.operator_name === s.operator_name);
+          return op ? selectedOps.includes(op.operator_id) : true;
+        })
+      : samples;
+
+    const areas = findProblemAreas(opSamples, cfg.primary);
+    
+    // Resolve location names using the operator inventory loaded in state
+    areas.forEach((a) => {
+      const opName = samples.find(s => s.latitude === a.lat || s.longitude === a.lon)?.operator_name || '';
+      const opId = operators.find(op => op.operator_name === opName)?.operator_id;
+      const opInv = opId ? invSites.filter(s => s.operator_id === opId) : invSites;
+      a.locationName = nearestSiteName(a.lat, a.lon, opInv, 50) || '';
+    });
+    return areas;
+  }, [samples, cfg, selectedOps, invSites, operators]);
 
   if (!allTests || !thresholdCfg) return <Loading height={400} />;
 
@@ -1232,6 +1272,34 @@ export default function DriveTestCluster() {
                           <span style={{ color: '#888', fontSize: 11 }}>
                             {Number(s.latitude).toFixed(5)}, {Number(s.longitude).toFixed(5)}
                           </span>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
+
+                {screenProblemAreas.map((a, i) => {
+                  const loc = a.locationName && a.locationName !== 'Unknown' && a.locationName !== '—'
+                    ? a.locationName
+                    : `(${Number(a.lat).toFixed(4)}, ${Number(a.lon).toFixed(4)})`;
+                  return (
+                    <CircleMarker
+                      key={`screen-prob-${i}`}
+                      center={[Number(a.lat), Number(a.lon)]}
+                      radius={8}
+                      pathOptions={{ color: '#d32f2f', fillColor: '#d32f2f', fillOpacity: 0.4, weight: 1.5, dashArray: '3,3' }}
+                    >
+                      <LeafletTooltip permanent direction="top" offset={[0, -5]} opacity={0.95}>
+                        <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#b71c1c', background: '#fff', padding: '1px 3px', borderRadius: '2px', border: '1px solid #b71c1c' }}>
+                          ⚠️ {loc}
+                        </span>
+                      </LeafletTooltip>
+                      <Popup>
+                        <div style={{ fontSize: 12 }}>
+                          <strong>Worst Coverage Area</strong><br />
+                          Location: {loc}<br />
+                          Average: {a.avgVal} {primary?.unit}<br />
+                          Samples: {a.samples}
                         </div>
                       </Popup>
                     </CircleMarker>
