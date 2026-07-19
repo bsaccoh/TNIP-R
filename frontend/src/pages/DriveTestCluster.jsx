@@ -662,11 +662,11 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
       });
 
       const safeKey = `${tech}_${opName.replace(/\s/g, '_')}`;
-      const primThin = thinSamples(opSamples).map((s) => [
+      const primThin = thinSamples(opSamples, 500).map((s) => [
         Number(s.latitude).toFixed(6), Number(s.longitude).toFixed(6),
         getSampleColor(s[cfg.primary.key], cfg.primary),
       ]);
-      const secThin = cfg.secondary ? thinSamples(opSamples).map((s) => [
+      const secThin = cfg.secondary ? thinSamples(opSamples, 500).map((s) => [
         Number(s.latitude).toFixed(6), Number(s.longitude).toFixed(6),
         getSampleColor(s[cfg.secondary.key], cfg.secondary),
       ]) : [];
