@@ -967,7 +967,23 @@ export async function generateFullReport(cluster, allTests, thresholdCfg, option
 </body>
 </html>`;
 
-  if (options.download) {
+  if (options.downloadHtml) {
+    try {
+      const htmlFilename = `DT_Report_${geo}_${dateStr.replace(/\s/g, '_')}.html`;
+      const blob = new Blob([htmlStr], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = htmlFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export HTML: ' + e.message);
+    }
+  } else if (options.download) {
     try {
       const pdfFilename = `DT_Report_${geo}_${dateStr.replace(/\s/g, '_')}.pdf`;
       const res = await api.post('/drive-tests/report/cluster/pdf', {

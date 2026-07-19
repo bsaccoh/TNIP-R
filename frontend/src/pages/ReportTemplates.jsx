@@ -726,7 +726,7 @@ function ClusterReportPanel({ onClose }) {
   const [allTests, setAllTests]       = useState(null);
   const [thresholdCfg, setThreshold]  = useState(null);
   const [selectedCluster, setCluster] = useState('');
-  const [generating, setGenerating]   = useState(false);
+  const [generating, setGenerating]   = useState(null);
   const [error, setError]             = useState('');
 
   useEffect(() => {
@@ -760,21 +760,23 @@ function ClusterReportPanel({ onClose }) {
     ? allTests.filter((t) => geoCluster(clusterFromName(t.test_name)) === selectedCluster).length
     : 0;
 
-  const handleGenerate = async (download = false) => {
+  const handleGenerate = async (mode = 'view') => {
     if (!selectedCluster) { setError('Please select a cluster first.'); return; }
     setError('');
-    setGenerating(true);
+    setGenerating(mode);
     try {
       // generateFullReport expects a raw cluster name (e.g. "Africell_Bo_CL01") and applies
       // geoCluster() internally. Find any matching full cluster name to avoid double-stripping.
       const fullCluster = allTests
         .map((t) => clusterFromName(t.test_name))
         .find((c) => c && geoCluster(c) === selectedCluster) || selectedCluster;
-      await generateFullReport(fullCluster, allTests, thresholdCfg, { download });
+      await generateFullReport(fullCluster, allTests, thresholdCfg, {
+        downloadHtml: mode === 'html'
+      });
     } catch (e) {
       setError(`Failed to generate report: ${e.message}`);
     } finally {
-      setGenerating(false);
+      setGenerating(null);
     }
   };
 
@@ -862,17 +864,17 @@ function ClusterReportPanel({ onClose }) {
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
         <Stack spacing={1}>
           <Button fullWidth variant="contained"
-            startIcon={generating ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
-            disabled={!selectedCluster || generating || loading}
-            onClick={handleGenerate}
+            startIcon={generating === 'view' ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+            disabled={!selectedCluster || !!generating || loading}
+            onClick={() => handleGenerate('view')}
             sx={{ bgcolor: '#e65100', '&:hover': { bgcolor: '#bf360c' } }}>
-            {generating ? 'Generating…' : 'Open in New Tab'}
+            {generating === 'view' ? 'Generating…' : 'Open in New Tab'}
           </Button>
           <Button fullWidth variant="outlined"
-            startIcon={generating ? <CircularProgress size={16} /> : <DownloadIcon />}
-            disabled={!selectedCluster || generating || loading}
-            onClick={() => handleGenerate(true)}>
-            {generating ? 'Generating…' : 'Download as HTML'}
+            startIcon={generating === 'html' ? <CircularProgress size={16} /> : <DownloadIcon />}
+            disabled={!selectedCluster || !!generating || loading}
+            onClick={() => handleGenerate('html')}>
+            {generating === 'html' ? 'Generating…' : 'Download as HTML'}
           </Button>
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
