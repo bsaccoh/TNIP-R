@@ -61,9 +61,9 @@ function pctBar(pct, color = '#1565c0') {
 
 function table(headers, rows, cellStyle = '') {
   return `<div style="overflow-x:auto;margin-bottom:20px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e0e0e0">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px;background:#fff">
       <thead>
-        <tr>${headers.map((h) => `<th style="padding:10px 12px;background:#1565c0;color:#fff;text-align:left;font-weight:600;font-size:13px">${h}</th>`).join('')}</tr>
+        <tr>${headers.map((h) => `<th style="padding:10px 12px;background:#1565c0;color:#fff;text-align:left;font-weight:600;font-size:15px">${h}</th>`).join('')}</tr>
       </thead>
       <tbody>
         ${rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f8f9fa'}">
@@ -76,7 +76,7 @@ function table(headers, rows, cellStyle = '') {
 
 function section(title, content) {
   return `<div style="margin-bottom:32px;page-break-inside:avoid;">
-    <h3 style="margin:0 0 16px;font-size:15px;color:#1565c0;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #1565c0;padding-bottom:6px">${title}</h3>
+    <h3 style="margin:0 0 16px;font-size:17px;color:#1565c0;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #1565c0;padding-bottom:6px">${title}</h3>
     ${content}
   </div>`;
 }
@@ -84,8 +84,8 @@ function section(title, content) {
 function kv(items) {
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:16px;margin-bottom:24px">
     ${items.map(([l, v, c]) => `<div style="background:#f8f9fa;border-radius:8px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,0.05);border:1px solid #eee">
-      <div style="font-size:12px;color:#757575;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${l}</div>
-      <div style="font-size:22px;font-weight:700;color:${c || '#1565c0'}">${v ?? '—'}</div>
+      <div style="font-size:13.5px;color:#757575;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${l}</div>
+      <div style="font-size:24px;font-weight:700;color:${c || '#1565c0'}">${v ?? '—'}</div>
     </div>`).join('')}
   </div>`;
 }
