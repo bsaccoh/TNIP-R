@@ -330,6 +330,10 @@ function buildHtml(template, data, config) {
       ]),
     ));
 
+    body += `<div style="font-size:11px;color:#555;font-style:italic;margin-top:-10px;margin-bottom:20px;padding:8px 12px;background:#f9f9f9;border-left:3px solid #1565c0;border-radius:3px;">
+      <strong>Note on Site Infrastructure:</strong> Orange operates 651 active cell sites, with Africell maintaining a smaller footprint below that level. Sierra Tel has no active drive test log data for the reporting period, and is therefore excluded from benchmarking.
+    </div>`;
+
     body += section('Regional QoS Analysis Slices', table(
       ['Region', 'Operator', 'Samples', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
       (data.regions || []).map((r) => [
@@ -776,6 +780,10 @@ function DataPreview({ template, data }) {
             </Box>
           </Stack>
         </Paper>
+
+        <Alert severity="info" sx={{ '& .MuiAlert-message': { fontSize: '0.78rem' }, py: 0.5 }}>
+          <strong>Infrastructure Note:</strong> Orange operates 651 active cell sites, with Africell maintaining a smaller footprint below that level. Sierra Tel has no active drive test log data for this reporting period.
+        </Alert>
 
         {data.operators?.length > 0 && (
           <Box>
