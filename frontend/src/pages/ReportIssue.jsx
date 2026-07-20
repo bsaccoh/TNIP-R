@@ -117,7 +117,7 @@ export default function ReportIssue() {
             Thank You for Your Report
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Your complaint has been submitted to NATCOM (National Telecommunications Commission).
+            Your complaint has been submitted to NatCA (National Telecommunications Authority).
             Our team will review it and take appropriate action.
           </Typography>
           <Chip label={`Ref: ${submitted.complaint_ref}`}
@@ -151,7 +151,7 @@ export default function ReportIssue() {
           <Typography variant="h5" fontWeight={700}>Report a Network Issue</Typography>
         </Stack>
         <Typography variant="body2" sx={{ opacity: 0.85, maxWidth: 500, mx: 'auto' }}>
-          NATCOM — National Telecommunications Commission of Sierra Leone
+          NatCA — National Telecommunications Authority of Sierra Leone
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
           Your report helps us monitor and improve network quality across the country.
@@ -258,7 +258,7 @@ export default function ReportIssue() {
             <Stack spacing={3}>
               <Typography variant="h6" fontWeight={700}>Your Contact Information</Typography>
               <Alert severity="info">
-                This information is optional. Providing it helps NATCOM follow up with you about
+                This information is optional. Providing it helps NatCA follow up with you about
                 your complaint. Your details are kept confidential.
               </Alert>
 
@@ -331,7 +331,7 @@ export default function ReportIssue() {
         </Paper>
 
         <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', mt: 3 }}>
-          National Telecommunications Commission (NATCOM) · Sierra Leone
+          National Telecommunications Authority (NatCA) · Sierra Leone
           <br />All complaints are processed in accordance with the Telecommunications Act 2006.
         </Typography>
       </Box>

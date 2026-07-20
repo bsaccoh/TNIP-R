@@ -102,7 +102,7 @@ export default function TrackComplaint() {
           <Typography variant="h5" fontWeight={700}>Track Your Complaint</Typography>
         </Stack>
         <Typography variant="body2" sx={{ opacity: 0.85, maxWidth: 500, mx: 'auto' }}>
-          NATCOM — National Telecommunications Commission of Sierra Leone
+          NatCA — National Telecommunications Authority of Sierra Leone
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
           Enter your reference number to check the status of your complaint.
@@ -260,7 +260,7 @@ export default function TrackComplaint() {
         </Stack>
 
         <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', mt: 1, mb: 3 }}>
-          National Telecommunications Commission (NATCOM) · Sierra Leone
+          National Telecommunications Authority (NatCA) · Sierra Leone
           <br />All complaints are processed in accordance with the Telecommunications Act 2006.
         </Typography>
       </Box>

@@ -283,7 +283,7 @@ export async function getReportData(regionId = null) {
   }
 
   return {
-    reportTitle: `NATCOM/TNIP-R Drive Test Analysis Report — ${regionName}`,
+    reportTitle: `NatCA/TNIP-R Drive Test Analysis Report — ${regionName}`,
     generatedAt: now.toISOString(),
     regionName,
     overview: {
@@ -521,7 +521,7 @@ export async function generatePdfReport(regionId = null) {
     doc.restore();
 
     doc.fontSize(28).font('Helvetica-Bold').fillColor('#ffffff');
-    doc.text('NATCOM / TNIP-R', 50, 200, { align: 'center', width: W });
+    doc.text('NatCA / TNIP-R', 50, 200, { align: 'center', width: W });
     doc.moveDown(0.3);
     doc.fontSize(22).text('Drive Test Analysis Report', 50, doc.y, { align: 'center', width: W });
     doc.moveDown(1.5);
@@ -765,7 +765,7 @@ export async function generateExcelReport(regionId = null) {
 
   // ── Sheet 1: Summary ──
   const summaryData = [
-    ['NATCOM / TNIP-R Drive Test Analysis Report'],
+    ['NatCA / TNIP-R Drive Test Analysis Report'],
     [],
     ['Report Scope', data.regionName],
     ['Generated', dateStr],
