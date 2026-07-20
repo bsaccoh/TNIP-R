@@ -318,12 +318,14 @@ function buildHtml(template, data, config) {
       ['Avg DL Throughput', gl.avgDl != null ? `${(gl.avgDl / 1000).toFixed(2)} Mbps` : '—'],
       ['Avg Voice MOS',    gl.avgMos != null ? `${gl.avgMos.toFixed(2)} / 5.0` : '—'],
       ['Avg Call Setup Time (RTT)', gl.avgRtt != null ? `${gl.avgRtt} ms` : '—'],
+      ['Total Measured Distance', gl.distance != null ? `${gl.distance.toLocaleString()} km` : '—'],
     ]));
 
     body += section('Operator Benchmarking Matrix', table(
-      ['Operator', 'Samples', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
+      ['Operator', 'Samples', 'Measured Distance', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
       (data.operators || []).map((o) => [
         o.name, o.samples.toLocaleString(),
+        o.distance != null ? `${o.distance.toLocaleString()} km` : '—',
         o.avgDl != null ? `${(o.avgDl / 1000).toFixed(2)} Mbps` : '—',
         o.avgMos != null ? `${o.avgMos.toFixed(2)} / 5.0` : '—',
         o.avgRtt != null ? `${o.avgRtt} ms` : '—',
@@ -335,9 +337,10 @@ function buildHtml(template, data, config) {
     </div>`;
 
     body += section('Regional QoS Analysis Slices', table(
-      ['Region', 'Operator', 'Samples', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
+      ['Region', 'Operator', 'Samples', 'Measured Distance', 'Avg DL Throughput', 'Avg Voice MOS', 'Avg Call Setup Latency'],
       (data.regions || []).map((r) => [
         r.region, r.operator, r.samples.toLocaleString(),
+        r.distance != null ? `${r.distance.toLocaleString()} km` : '—',
         r.avgDl != null ? `${(r.avgDl / 1000).toFixed(2)} Mbps` : '—',
         r.avgMos != null ? `${r.avgMos.toFixed(2)} / 5.0` : '—',
         r.avgRtt != null ? `${r.avgRtt} ms` : '—',
@@ -778,6 +781,13 @@ function DataPreview({ template, data }) {
               </Typography>
               <Typography variant="caption" color="text.secondary">Setup Latency</Typography>
             </Box>
+            <Divider orientation="vertical" flexItem />
+            <Box sx={{ textAlign: 'center', flex: 1 }}>
+              <Typography variant="h5" fontWeight={700} color="secondary.main">
+                {gl.distance != null ? `${gl.distance.toLocaleString()} km` : '—'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">Total Distance</Typography>
+            </Box>
           </Stack>
         </Paper>
 
@@ -797,7 +807,7 @@ function DataPreview({ template, data }) {
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{o.name}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {o.samples.toLocaleString()} samples · Latency: {o.avgRtt != null ? `${o.avgRtt} ms` : '—'}
+                        {o.samples.toLocaleString()} samples · {o.distance != null ? `${o.distance.toLocaleString()} km` : '—'} · Latency: {o.avgRtt != null ? `${o.avgRtt} ms` : '—'}
                       </Typography>
                     </Box>
                     <Stack direction="row" spacing={1}>
@@ -821,7 +831,9 @@ function DataPreview({ template, data }) {
                 <Grid item xs={6} key={i}>
                   <Paper elevation={0} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                     <Typography variant="body2" fontWeight={700}>{r.region}</Typography>
-                    <Typography variant="caption" color="text.secondary" display="block">{r.operator}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {r.operator} · {r.samples.toLocaleString()} samples · {r.distance != null ? `${r.distance.toLocaleString()} km` : '—'}
+                    </Typography>
                     <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
                       <Typography variant="caption" color="primary.main" fontWeight={600}>
                         {r.avgDl != null ? `${(r.avgDl / 1000).toFixed(1)} Mbps` : '—'}

@@ -350,20 +350,27 @@ async function fetchQoEBenchmark({ from, to, operatorId }) {
   const global = await query(`
     SELECT ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
            ROUND(AVG(s.mos), 2)           AS avg_mos,
-           ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt
+           ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt,
+           (SELECT ROUND(COALESCE(SUM(dt2.distance_km), 0), 2)
+              FROM drive_tests dt2
+             WHERE dt2.test_date BETWEEN :from AND :to AND dt2.status = 'COMPLETED') AS total_distance
       FROM drive_tests dt
       LEFT JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
      WHERE dt.test_date BETWEEN :from AND :to AND dt.status = 'COMPLETED'`,
     { from, to }).catch(() => [{}]);
 
-  const globalStats = global[0] || { avg_dl: null, avg_mos: null, avg_rtt: null };
+  const globalStats = global[0] || { avg_dl: null, avg_mos: null, avg_rtt: null, total_distance: 0 };
 
   const operators = await query(`
     SELECT o.operator_name,
            ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
            ROUND(AVG(s.mos), 2)           AS avg_mos,
            ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt,
-           COUNT(s.sample_id)             AS sample_count
+           COUNT(s.sample_id)             AS sample_count,
+           (SELECT ROUND(COALESCE(SUM(dt2.distance_km), 0), 2)
+              FROM drive_tests dt2
+             WHERE dt2.operator_id = o.operator_id
+               AND dt2.test_date BETWEEN :from AND :to AND dt2.status = 'COMPLETED') AS total_distance
       FROM drive_tests dt
       JOIN operators o ON o.operator_id = dt.operator_id
       LEFT JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
@@ -385,7 +392,32 @@ async function fetchQoEBenchmark({ from, to, operatorId }) {
       ROUND(AVG(s.dl_throughput), 2) AS avg_dl,
       ROUND(AVG(s.mos), 2)           AS avg_mos,
       ROUND(AVG(s.rtt_ms), 1)        AS avg_rtt,
-      COUNT(s.sample_id)             AS sample_count
+      COUNT(s.sample_id)             AS sample_count,
+      (SELECT ROUND(COALESCE(SUM(dt3.distance_km), 0), 2)
+         FROM drive_tests dt3
+        WHERE dt3.operator_id = o.operator_id
+          AND dt3.test_date BETWEEN :from AND :to AND dt3.status = 'COMPLETED'
+          AND dt3.drive_test_id IN (
+              SELECT DISTINCT s2.drive_test_id 
+                FROM drive_test_samples s2
+               WHERE (
+                 CASE 
+                   WHEN s2.latitude >= 8.3 AND s2.latitude <= 8.6 AND s2.longitude >= -13.4 AND s2.longitude <= -13.0 THEN 'Western Area'
+                   WHEN s2.latitude > 8.6 THEN 'Northern'
+                   WHEN s2.latitude < 8.3 AND s2.longitude <= -11.5 THEN 'Southern'
+                   WHEN s2.latitude < 9.0 AND s2.longitude > -11.5 THEN 'Eastern'
+                   ELSE 'Other'
+                 END
+               ) = 
+               CASE 
+                 WHEN s.latitude >= 8.3 AND s.latitude <= 8.6 AND s.longitude >= -13.4 AND s.longitude <= -13.0 THEN 'Western Area'
+                 WHEN s.latitude > 8.6 THEN 'Northern'
+                 WHEN s.latitude < 8.3 AND s.longitude <= -11.5 THEN 'Southern'
+                 WHEN s.latitude < 9.0 AND s.longitude > -11.5 THEN 'Eastern'
+                 ELSE 'Other'
+               END
+          )
+      ) AS total_distance
     FROM drive_tests dt
     JOIN operators o ON o.operator_id = dt.operator_id
     JOIN drive_test_samples s ON s.drive_test_id = dt.drive_test_id
@@ -400,14 +432,16 @@ async function fetchQoEBenchmark({ from, to, operatorId }) {
     global: {
       avgDl: globalStats.avg_dl ? Number(globalStats.avg_dl) : null,
       avgMos: globalStats.avg_mos ? Number(globalStats.avg_mos) : null,
-      avgRtt: globalStats.avg_rtt ? Number(globalStats.avg_rtt) : null
+      avgRtt: globalStats.avg_rtt ? Number(globalStats.avg_rtt) : null,
+      distance: globalStats.total_distance ? Number(globalStats.total_distance) : 0
     },
     operators: operators.map((o) => ({
       name: o.operator_name,
       avgDl: o.avg_dl ? Number(o.avg_dl) : null,
       avgMos: o.avg_mos ? Number(o.avg_mos) : null,
       avgRtt: o.avg_rtt ? Number(o.avg_rtt) : null,
-      samples: Number(o.sample_count)
+      samples: Number(o.sample_count),
+      distance: Number(o.total_distance)
     })),
     regions: regions.map((r) => ({
       region: r.region_name,
@@ -415,7 +449,8 @@ async function fetchQoEBenchmark({ from, to, operatorId }) {
       avgDl: r.avg_dl ? Number(r.avg_dl) : null,
       avgMos: r.avg_mos ? Number(r.avg_mos) : null,
       avgRtt: r.avg_rtt ? Number(r.avg_rtt) : null,
-      samples: Number(r.sample_count)
+      samples: Number(r.sample_count),
+      distance: Number(r.total_distance)
     }))
   };
 }
