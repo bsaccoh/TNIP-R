@@ -1,0 +1,1188 @@
+<title>TNIP-R — NatCA Executive Presentation</title>
+<style>
+  :root{
+    --page:#EEF3FA; --card:#FFFFFF; --soft:#F4F7FC;
+    --ink:#12233F; --ink2:#47597A; --ink3:#8595AD;
+    --brand:#1565C0; --brand-dark:#0D3C7A; --brand-light:#E3EDFB;
+    --op-orange:#E8710A; --op-africell:#7C3AED; --op-qcell:#0E9F6E; --op-sierratel:#1565C0;
+    --good:#1E8E4E; --warn:#C77700; --crit:#D23F3A;
+    --line:#DCE6F2;
+    --shadow:0 1px 3px rgba(18,35,63,.06),0 6px 20px rgba(18,35,63,.05);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--page); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    overflow:hidden;
+  }
+  .deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    padding:46px 64px 74px;opacity:0;visibility:hidden;transform:translateX(36px);
+    transition:opacity .4s ease,transform .4s ease,visibility .4s;
+    overflow:auto;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:none}
+  .slide.prev{transform:translateX(-36px)}
+
+  .chrome{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;
+    justify-content:space-between;padding:11px 24px;z-index:50;
+    background:linear-gradient(transparent,rgba(238,243,250,.9));pointer-events:none}
+  .chrome>*{pointer-events:auto}
+  .dots{display:flex;gap:6px;flex-wrap:wrap;max-width:58%;justify-content:center}
+  .dots button{width:8px;height:8px;border-radius:50%;border:none;background:#B7C6DC;opacity:.7;cursor:pointer;transition:.2s}
+  .dots button.on{opacity:1;background:var(--brand);transform:scale(1.3)}
+  .navbtns{display:flex;gap:9px}
+  .navbtns button{
+    background:var(--card);border:1px solid var(--line);color:var(--brand);
+    width:38px;height:38px;border-radius:10px;font-size:17px;cursor:pointer;transition:.15s;box-shadow:var(--shadow)}
+  .navbtns button:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .counter{font-size:12px;color:var(--ink3);letter-spacing:.1em;font-variant-numeric:tabular-nums;min-width:62px}
+  .brandtag{position:fixed;top:16px;right:24px;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--ink3);z-index:50}
+  .kbd-hint{position:fixed;top:16px;left:24px;font-size:11px;color:var(--ink3);z-index:50;opacity:.8}
+
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);font-weight:700;margin-bottom:10px}
+  .secnum{font-size:11px;color:var(--ink3);font-weight:700;letter-spacing:.06em;margin-bottom:4px;text-transform:uppercase}
+  h1{font-size:clamp(38px,5.2vw,62px);font-weight:800;line-height:1.05;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-size:clamp(23px,2.6vw,33px);font-weight:800;letter-spacing:-.01em;margin-bottom:4px;text-wrap:balance;color:var(--brand-dark)}
+  .sub{font-size:15px;color:var(--ink2);max-width:74ch;line-height:1.55;margin-top:6px}
+  .lede{font-size:17px;color:var(--ink2);line-height:1.6;max-width:60ch}
+
+  .row{display:flex;gap:22px;align-items:stretch}
+  .col{flex:1;min-width:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .panel h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-dark);font-weight:700;margin-bottom:13px}
+  .panelbar{background:var(--brand-dark);color:#fff;font-size:12px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;padding:8px 14px;border-radius:10px 10px 0 0;margin:-18px -18px 14px}
+  .flexgrow{flex:1;display:flex;flex-direction:column;min-height:0}
+  .row.flexgrow{flex-direction:row}
+  .mt-auto{margin-top:auto}
+  .scrollx{overflow-x:auto}
+
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .stat::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--brand)}
+  .stat.o2::after{background:var(--op-orange)} .stat.o3::after{background:var(--op-qcell)} .stat.o4::after{background:var(--op-africell)}
+  .stat .v{font-size:33px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--brand-dark)}
+  .stat .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-top:5px;font-weight:600}
+  .stat .d{font-size:11.5px;color:var(--ink3);margin-top:3px}
+
+  .legend{display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:11px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--brand-light);border:1px solid #C6DCF5;
+    border-radius:999px;padding:4px 11px;font-size:12px;color:var(--brand-dark);font-weight:600}
+  .chip .dot{width:8px;height:8px;border-radius:50%}
+
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:700;
+    text-align:left;padding:7px 10px;border-bottom:2px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+  td:first-child{color:var(--ink);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  th.num,td.num{text-align:right}
+  tbody tr:nth-child(even){background:var(--soft)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.03em}
+  .pill.good{background:rgba(30,142,78,.14);color:#157A40}
+  .pill.warn{background:rgba(199,119,0,.14);color:#A66300}
+  .pill.crit{background:rgba(210,63,58,.13);color:#B7332E}
+
+  .hbar{display:grid;grid-template-columns:80px 1fr 56px;gap:10px;align-items:center;margin-bottom:12px;font-size:13px}
+  .hbar .name{color:var(--ink2);font-weight:600;text-align:right}
+  .hbar .track{height:21px;background:#EAF0F8;border-radius:5px;overflow:hidden;position:relative}
+  .hbar .fill{height:100%;border-radius:0 4px 4px 0;width:0;transition:width 1s cubic-bezier(.25,.7,.3,1)}
+  .active .hbar .fill{width:var(--w)}
+  .hbar .val{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+  .stackrow{display:grid;grid-template-columns:80px 1fr 88px;gap:10px;align-items:center;margin-bottom:13px;font-size:13px}
+  .stackrow .name{color:var(--ink2);font-weight:600;text-align:right}
+  .stackrow .track{height:23px;display:flex;border-radius:5px;overflow:hidden;background:#EAF0F8;gap:2px}
+  .stackrow .seg{height:100%;width:0;transition:width .9s ease .15s}
+  .active .stackrow .seg{width:var(--w)}
+  .stackrow .meta{font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+  svg text{font-family:inherit}
+  .axis{stroke:#C9D6E7} .gridln{stroke:#E7EEF6}
+  .ticklbl{fill:var(--ink3);font-size:10px}
+
+  .animline{stroke-dasharray:900;stroke-dashoffset:900}
+  .active .animline{animation:drawline 1.4s ease forwards .2s}
+  @keyframes drawline{to{stroke-dashoffset:0}}
+  .fadein{opacity:0;transform:translateY(11px);transition:opacity .55s ease,transform .55s ease}
+  .active .fadein{opacity:1;transform:none}
+  .active .fadein.d1{transition-delay:.1s}.active .fadein.d2{transition-delay:.2s}
+  .active .fadein.d3{transition-delay:.3s}.active .fadein.d4{transition-delay:.4s}
+  .active .fadein.d5{transition-delay:.5s}
+  .donutseg{transition:stroke-dashoffset 1.1s ease .2s}
+
+  /* Hero slides (title & closing) — blue */
+  .hero{justify-content:center;align-items:flex-start;
+    background:linear-gradient(135deg,#0D3C7A 0%,#1565C0 60%,#1E74D6 100%);color:#fff}
+  .hero h1,.hero h2{color:#fff}
+  .hero .eyebrow{color:#BBD6F7}
+  .hero .lede{color:#DCEAFB}
+  .hero .stat{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);box-shadow:none}
+  .hero .stat .v{color:#fff}.hero .stat .l{color:#C7DCF6}.hero .stat::after{background:#8FC0F5}
+  .hero .chip{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff}
+  .hero .flowstep .n{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff}
+  .hero .flowstep b{color:#fff}.hero .flowstep p{color:#D3E4F9}
+  .hero .sig{display:flex;gap:11px;margin-top:34px;flex-wrap:wrap}
+  .pulse-grid{position:absolute;inset:0;pointer-events:none;opacity:.6}
+
+  .agenda-item{display:flex;gap:15px;align-items:center;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:14px 17px;box-shadow:var(--shadow)}
+  .agenda-item .an{font-size:19px;font-weight:800;color:var(--brand);font-variant-numeric:tabular-nums;min-width:30px}
+  .agenda-item.org .an{color:var(--op-orange)}
+  .agenda-item b{font-size:14.5px;display:block;color:var(--ink)}
+  .agenda-item p{font-size:12px;color:var(--ink3);margin-top:2px}
+
+  .flowstep{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+  .flowstep .n{width:26px;height:26px;border-radius:8px;background:var(--brand-light);border:1px solid #C6DCF5;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--brand);flex-shrink:0}
+  .flowstep b{display:block;font-size:13.5px;margin-bottom:2px;color:var(--ink)}
+  .flowstep p{font-size:12px;color:var(--ink2);line-height:1.5}
+
+  .bignum{font-size:56px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;color:var(--brand)}
+  .ticker{display:inline-block}
+  code{background:#EAF1FA;padding:2px 7px;border-radius:5px;font-size:11px;color:var(--brand-dark)}
+
+  .dtmetric{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .dtmetric:last-child{border-bottom:none}
+  .dtmetric .k{color:var(--ink2)}
+  .dtmetric .v{color:var(--brand-dark);font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* Phone — light app UI, fits within slide */
+  .phone{
+    width:228px;height:446px;background:#0D1B2A;border-radius:32px;
+    border:2px solid #22354D;box-shadow:0 18px 44px rgba(13,60,122,.28),inset 0 0 0 4px #16273B;
+    position:relative;overflow:hidden;flex-shrink:0}
+  .phone::before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);
+    width:70px;height:16px;background:#16273B;border-radius:9px;z-index:30}
+  .pscreen{position:absolute;inset:6px;border-radius:26px;overflow:hidden;background:#F4F7FC}
+  .appscr{position:absolute;inset:0;padding:34px 13px 11px;display:flex;flex-direction:column;
+    opacity:0;visibility:hidden;transform:translateX(44px);transition:opacity .4s,transform .4s,visibility .4s}
+  .appscr.on{opacity:1;visibility:visible;transform:none}
+  .appscr.off{transform:translateX(-44px)}
+  .appbar{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;margin-bottom:10px;color:var(--brand-dark)}
+  .appbar .back{color:var(--ink3)}
+  .ffield{background:#fff;border:1px solid #D3E0F0;border-radius:9px;
+    padding:7px 10px;font-size:11px;color:var(--ink2);margin-bottom:7px;position:relative;min-height:33px}
+  .ffield .flabel{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:3px;font-weight:700}
+  .ffield .fval{color:var(--ink);font-weight:600;min-height:12px;display:inline-block}
+  .caret::after{content:"";display:inline-block;width:1.5px;height:11px;background:var(--brand);
+    vertical-align:-2px;margin-left:1px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .abtn{margin-top:auto;background:var(--brand);color:#fff;border-radius:10px;text-align:center;
+    padding:9px;font-size:12px;font-weight:700;position:relative;overflow:hidden}
+  .abtn.ghost{background:#fff;border:1px solid #D3E0F0;color:var(--brand-dark)}
+  .abtn.pressing{animation:press .3s ease}
+  @keyframes press{50%{transform:scale(.96);filter:brightness(1.12)}}
+  .tapdot{position:absolute;width:32px;height:32px;border-radius:50%;background:rgba(21,101,192,.28);
+    transform:scale(0);pointer-events:none;z-index:40}
+  .tapdot.go{animation:tap .5s ease}
+  @keyframes tap{0%{transform:scale(0);opacity:1}100%{transform:scale(1.7);opacity:0}}
+  .stepdots{display:flex;gap:5px;justify-content:center;margin-bottom:10px}
+  .stepdots i{width:20px;height:3px;border-radius:2px;background:#D3E0F0}
+  .stepdots i.done{background:var(--brand)}
+  .idcard{border:1.5px dashed #A9C6EC;border-radius:11px;height:98px;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink3);font-size:10px;
+    position:relative;overflow:hidden;background:#EAF1FB}
+  .scanline{position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,var(--brand),transparent);
+    top:12%;opacity:0}
+  .scanning .scanline{opacity:1;animation:scan 1.6s ease-in-out infinite}
+  @keyframes scan{0%,100%{top:12%}50%{top:85%}}
+  .selfiecircle{width:92px;height:92px;border-radius:50%;border:2.5px solid #D3E0F0;margin:7px auto;
+    display:flex;align-items:center;justify-content:center;font-size:34px;position:relative;background:#fff}
+  .scanning .selfiecircle{border-color:var(--brand);animation:ringpulse 1.4s ease infinite}
+  @keyframes ringpulse{50%{box-shadow:0 0 0 8px rgba(21,101,192,.13)}}
+  .checkmark{width:64px;height:64px;border-radius:50%;background:rgba(30,142,78,.14);margin:11px auto;
+    display:flex;align-items:center;justify-content:center}
+  .checkmark svg{width:33px;height:33px}
+  .checkmark path{stroke:#1E8E4E;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:48;stroke-dashoffset:48}
+  .appscr.on .checkmark path{animation:tick .55s ease forwards .25s}
+  @keyframes tick{to{stroke-dashoffset:0}}
+  .opchoice{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #D9E3F1;
+    border-radius:10px;padding:8px 10px;font-size:11px;margin-bottom:6px;font-weight:600;color:var(--ink)}
+  .opchoice .dot{width:10px;height:10px;border-radius:50%}
+  .opchoice.sel{border-color:var(--brand);background:var(--brand-light)}
+  .progressbar{height:4px;border-radius:3px;background:#D3E0F0;overflow:hidden;margin-top:8px}
+  .progressbar i{display:block;height:100%;background:var(--brand);width:0;transition:width 1.2s ease}
+  .statustrack{display:flex;flex-direction:column;gap:0;margin-top:5px}
+  .stnode{display:flex;gap:9px;font-size:10px;color:var(--ink3)}
+  .stnode .ic{width:14px;height:14px;border-radius:50%;background:#D3E0F0;flex-shrink:0;margin-top:1px;
+    display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
+  .stnode.done .ic{background:var(--good)} .stnode.now .ic{background:var(--brand);animation:ringpulse 1.4s infinite}
+  .simcap{font-size:12px;color:var(--ink3);text-align:center;margin-top:10px;min-height:16px;font-style:italic}
+  .simstage{display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+  .maproute{border-radius:12px;background:#EEEAE0;position:relative;overflow:hidden;border:1px solid var(--line)}
+  .maplabel{font-size:9.5px;fill:#8A8272;font-weight:600;letter-spacing:.04em}
+  .warnlabel{font-size:9px;fill:#B7332E;font-weight:700}
+  .mapdot{opacity:0}
+  .active .mapdot{animation:popdot .3s ease forwards}
+  @keyframes popdot{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+
+  .radarpoly{opacity:0;transform-origin:center;transform:scale(.6)}
+  .active .radarpoly{animation:radarin .8s cubic-bezier(.2,.8,.3,1.1) forwards}
+  .active .radarpoly.r2{animation-delay:.18s}.active .radarpoly.r3{animation-delay:.36s}
+  @keyframes radarin{to{opacity:1;transform:scale(1)}}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  }
+</style>
+
+<div class="deck" id="deck">
+
+<!-- ══ 1 · TITLE ══ -->
+<section class="slide hero active" data-title="Title">
+  <svg class="pulse-grid" width="100%" height="100%" preserveAspectRatio="none">
+    <defs><pattern id="gp" width="46" height="46" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.1" fill="rgba(255,255,255,.14)"/></pattern></defs>
+    <rect width="100%" height="100%" fill="url(#gp)"/>
+  </svg>
+  <div style="position:relative;z-index:2;max-width:940px">
+    <div class="eyebrow fadein">Executive Briefing · National Communications Authority · Sierra Leone</div>
+    <h1 class="fadein d1">TNIP‑R</h1>
+    <h1 class="fadein d1" style="font-size:clamp(20px,2.4vw,30px);color:#BBD6F7;margin-top:6px">
+      Telecom National Intelligence Platform — Regulatory</h1>
+    <p class="lede fadein d2" style="margin-top:22px">
+      An integrated system for independent monitoring of network quality of service, licence
+      compliance and coverage across all licensed operators — together with the
+      <strong style="color:#fff">QoS Complaint mobile application</strong> for verified citizen reporting.
+    </p>
+    <div class="sig">
+      <span class="chip fadein d3"><span class="dot" style="background:var(--op-orange)"></span>Orange</span>
+      <span class="chip fadein d3"><span class="dot" style="background:var(--op-africell)"></span>Africell</span>
+      <span class="chip fadein d4"><span class="dot" style="background:var(--op-qcell)"></span>Qcell</span>
+      <span class="chip fadein d4"><span class="dot" style="background:#8FC0F5"></span>SierraTel</span>
+      <span class="chip fadein d5" style="background:rgba(255,255,255,.22)">Presented with live production data</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 2 · AGENDA ══ -->
+<section class="slide" data-title="Agenda">
+  <div class="eyebrow">Presentation Contents</div>
+  <h2>Agenda</h2>
+  <p class="sub">Eight functional areas of the platform, followed by a demonstration of the citizen mobile application and proposed next steps.</p>
+  <div class="grid2" style="margin-top:22px;gap:13px">
+    <div class="agenda-item fadein d1"><span class="an">1</span><div><b>Performance Management</b><p>Automated KPI computation from operator PM data</p></div></div>
+    <div class="agenda-item fadein d1"><span class="an">2</span><div><b>Compliance Management</b><p>Threshold evaluation, alerts and enforcement</p></div></div>
+    <div class="agenda-item fadein d2"><span class="an">3</span><div><b>Network &amp; Coverage</b><p>National site and cell inventory</p></div></div>
+    <div class="agenda-item fadein d2"><span class="an">4</span><div><b>Drive Testing</b><p>Independent field measurement and analysis</p></div></div>
+    <div class="agenda-item fadein d3"><span class="an">5</span><div><b>Operators &amp; QoE</b><p>Per‑operator dashboards and comparison</p></div></div>
+    <div class="agenda-item fadein d3"><span class="an">6</span><div><b>Report Management</b><p>Regulatory report generation and export</p></div></div>
+    <div class="agenda-item fadein d4"><span class="an">7</span><div><b>AI Features</b><p>Assisted analysis and recommendations</p></div></div>
+    <div class="agenda-item org fadein d4"><span class="an">8</span><div><b>QoS Complaint Application</b><p>Citizen reporting — KYC &amp; complaint demonstration</p></div></div>
+  </div>
+</section>
+
+<!-- ══ 3 · EXECUTIVE SUMMARY ══ -->
+<section class="slide" data-title="Executive summary">
+  <div class="eyebrow">Executive Summary</div>
+  <h2>Platform overview</h2>
+  <p class="sub">TNIP‑R replaces operator self‑reporting with independent measurement, combining three
+    evidence sources — operator counter data, regulator drive tests and verified citizen complaints —
+    into a single quality‑of‑service picture.</p>
+  <div class="grid2 flexgrow" style="margin-top:20px">
+    <div class="panel fadein d1">
+      <div class="panelbar">TNIP‑R · Regulator platform</div>
+      <div class="flowstep"><div class="n">1</div><div><b>Performance management</b>
+        <p>Ingests Huawei PM counter files and computes 40+ KPIs per operator and technology through a formula‑driven engine.</p></div></div>
+      <div class="flowstep"><div class="n">2</div><div><b>Compliance engine</b>
+        <p>Every KPI is evaluated against licence thresholds — PASS / WARNING / FAIL — with automatic alerts and enforcement case tracking.</p></div></div>
+      <div class="flowstep"><div class="n">3</div><div><b>Drive testing &amp; coverage</b>
+        <p>Independent field campaigns mapped street‑by‑street: coverage, quality, throughput and dead zones per operator and technology.</p></div></div>
+      <div class="flowstep" style="margin-bottom:0"><div class="n">4</div><div><b>Reporting &amp; AI</b>
+        <p>Auto‑generated remarks, problem‑area detection, and one‑click PDF / Excel regulatory reports.</p></div></div>
+    </div>
+    <div class="panel fadein d2">
+      <div class="panelbar" style="background:var(--op-orange)">QoS Complaint · Citizen mobile application</div>
+      <div class="flowstep"><div class="n">1</div><div><b>Verified subscribers</b>
+        <p>KYC registration — national ID capture and selfie match — so every complaint is a verified, attributable data point.</p></div></div>
+      <div class="flowstep"><div class="n">2</div><div><b>Structured complaint filing</b>
+        <p>Operator, issue category, GPS location and live signal readings captured automatically at submission.</p></div></div>
+      <div class="flowstep"><div class="n">3</div><div><b>Transparent tracking</b>
+        <p>Subscribers follow a complaint from submission to operator response to regulator resolution.</p></div></div>
+      <div class="flowstep" style="margin-bottom:0"><div class="n">4</div><div><b>Feeds TNIP‑R</b>
+        <p>Complaints stream into the platform as a continuous quality‑of‑experience layer, overlaid on the coverage map.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 4 · DEPLOYMENT STATUS ══ -->
+<section class="slide" data-title="Deployment status">
+  <div class="eyebrow">Current Deployment Status</div>
+  <h2>Live production figures</h2>
+  <p class="sub">Every figure on this slide is read from the operational TNIP‑R national dashboard.</p>
+  <div class="grid4" style="margin-top:22px">
+    <div class="stat fadein d1"><div class="v ticker" data-n="4">0</div><div class="l">Licensed operators</div><div class="d">Orange · Africell · Qcell · SierraTel</div></div>
+    <div class="stat o2 fadein d2"><div class="v ticker" data-n="1841">0</div><div class="l">Total sites</div><div class="d">Full national inventory</div></div>
+    <div class="stat o3 fadein d3"><div class="v ticker" data-n="52101">0</div><div class="l">Total cells</div><div class="d">2G · 3G · 4G</div></div>
+    <div class="stat o4 fadein d4"><div class="v ticker" data-n="639">0</div><div class="l">Drive tests</div><div class="d">807.3 km measured</div></div>
+  </div>
+  <div class="row flexgrow" style="margin-top:22px">
+    <div class="panel col fadein d3">
+      <h3>National operator QoS ranking</h3>
+      <div class="hbar"><span class="name">Africell</span><div class="track"><div class="fill" style="--w:98.8%;background:var(--op-africell)"></div></div><span class="val">98.8</span></div>
+      <div class="hbar"><span class="name">Orange</span><div class="track"><div class="fill" style="--w:98.7%;background:var(--op-orange)"></div></div><span class="val">98.7</span></div>
+      <div class="hbar"><span class="name">Qcell</span><div class="track"><div class="fill" style="--w:98.4%;background:var(--op-qcell)"></div></div><span class="val">98.4</span></div>
+      <div class="hbar" style="margin-bottom:0"><span class="name">SierraTel</span><div class="track"><div class="fill" style="--w:98.0%;background:var(--op-sierratel)"></div></div><span class="val">98.0</span></div>
+      <p style="font-size:12px;color:var(--ink3);margin-top:11px">Composite QoS score — weighted KPI compliance, latest ranking period. (Quality score, independent of network size.)</p>
+    </div>
+    <div class="panel col fadein d4">
+      <h3>Regulatory value</h3>
+      <div class="flowstep"><div class="n">✓</div><div><b>Independence</b><p>KPIs computed from raw counter files, not operator summaries.</p></div></div>
+      <div class="flowstep"><div class="n">✓</div><div><b>Traceability</b><p>Every verdict links to source files, thresholds and timestamps.</p></div></div>
+      <div class="flowstep" style="margin-bottom:0"><div class="n">✓</div><div><b>Timeliness</b><p>Upload‑to‑verdict in minutes; regulatory report in one click.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 5 · PERFORMANCE MANAGEMENT ══ -->
+<section class="slide" data-title="Performance">
+  <div class="secnum">Section 1</div>
+  <div class="eyebrow">Performance Management</div>
+  <h2>KPI computation from operator PM data</h2>
+  <div class="row flexgrow" style="margin-top:18px">
+    <div class="col" style="flex:1.1;display:flex;flex-direction:column;gap:16px">
+      <div class="panel fadein d1">
+        <h3>Ingestion &amp; computation pipeline</h3>
+        <svg viewBox="0 0 520 92" width="100%" style="max-height:98px">
+          <g font-size="11" font-weight="600">
+            <rect x="4" y="24" width="108" height="44" rx="9" fill="#EAF1FB" stroke="#C6DCF5"/>
+            <text x="58" y="43" text-anchor="middle" fill="#12233F">Huawei PM files</text>
+            <text x="58" y="58" text-anchor="middle" fill="#8595AD" font-size="9" font-weight="400">pmresult · named CSV</text>
+            <rect x="152" y="24" width="96" height="44" rx="9" fill="#EAF1FB" stroke="#C6DCF5"/>
+            <text x="200" y="43" text-anchor="middle" fill="#12233F">Parser</text>
+            <text x="200" y="58" text-anchor="middle" fill="#8595AD" font-size="9" font-weight="400">tech auto‑detect</text>
+            <rect x="288" y="24" width="104" height="44" rx="9" fill="#EAF1FB" stroke="#C6DCF5"/>
+            <text x="340" y="43" text-anchor="middle" fill="#12233F">KPI engine</text>
+            <text x="340" y="58" text-anchor="middle" fill="#8595AD" font-size="9" font-weight="400">formula evaluator</text>
+            <rect x="432" y="24" width="84" height="44" rx="9" fill="#1565C0"/>
+            <text x="474" y="43" text-anchor="middle" fill="#fff">Dashboards</text>
+            <text x="474" y="58" text-anchor="middle" fill="#CFE2FF" font-size="9" font-weight="400">+ compliance</text>
+            <g stroke="#1565C0" stroke-width="1.6" marker-end="url(#arr)">
+              <defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L8 4 L0 8 z" fill="#1565C0"/></marker></defs>
+              <line x1="114" y1="46" x2="148" y2="46"/><line x1="250" y1="46" x2="284" y2="46"/><line x1="394" y1="46" x2="428" y2="46"/>
+            </g>
+          </g>
+        </svg>
+        <p style="font-size:12px;color:var(--ink2);line-height:1.5;margin-top:8px">
+          Two Huawei formats are supported — binary <code>pmresult</code> and named CSV — with technology and
+          granularity (15‑min, 30‑min, hourly) detected automatically per file.</p>
+      </div>
+      <div class="panel fadein d2">
+        <h3>Admin‑defined KPI formulas</h3>
+        <div style="background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink);line-height:1.7">
+          <span style="color:var(--ink3)">RRC Setup Success Rate =</span><br>
+          <code>100 × {L.RRC.ConnReq.Succ} / NULLIF({L.RRC.ConnReq.Att}, 0)</code>
+        </div>
+        <p style="font-size:11.5px;color:var(--ink3);margin-top:8px">Validated before activation; supports NULLIF, ABS, MIN, MAX, COALESCE — null‑safe so missing counters skip cleanly.</p>
+      </div>
+    </div>
+    <div class="panel col fadein d3">
+      <h3>Cell availability trend · sample week</h3>
+      <svg viewBox="0 0 440 232" width="100%">
+        <g class="gridln" stroke-width="1">
+          <line x1="46" y1="28" x2="425" y2="28"/><line x1="46" y1="76" x2="425" y2="76"/>
+          <line x1="46" y1="124" x2="425" y2="124"/><line x1="46" y1="172" x2="425" y2="172"/>
+        </g>
+        <line x1="46" y1="204" x2="425" y2="204" class="axis" stroke-width="1"/>
+        <g class="ticklbl"><text x="38" y="32" text-anchor="end">100%</text><text x="38" y="80" text-anchor="end">98%</text>
+          <text x="38" y="128" text-anchor="end">96%</text><text x="38" y="176" text-anchor="end">94%</text>
+          <text x="70" y="220">Mon</text><text x="128" y="220">Tue</text><text x="186" y="220">Wed</text>
+          <text x="244" y="220">Thu</text><text x="302" y="220">Fri</text><text x="360" y="220">Sat</text><text x="412" y="220">Sun</text></g>
+        <path class="animline" d="M62 50 L120 44 L178 56 L236 40 L294 48 L352 36 L416 42" fill="none" stroke="#7C3AED" stroke-width="2"/>
+        <path class="animline" d="M62 58 L120 64 L178 52 L236 60 L294 56 L352 62 L416 54" fill="none" stroke="#E8710A" stroke-width="2"/>
+        <path class="animline" d="M62 76 L120 68 L178 82 L236 72 L294 86 L352 76 L416 70" fill="none" stroke="#0E9F6E" stroke-width="2"/>
+        <path class="animline" d="M62 94 L120 102 L178 90 L236 106 L294 96 L352 110 L416 98" fill="none" stroke="#1565C0" stroke-width="2"/>
+      </svg>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--op-africell)"></span>Africell</span>
+        <span><span class="swatch" style="background:var(--op-orange)"></span>Orange</span>
+        <span><span class="swatch" style="background:var(--op-qcell)"></span>Qcell</span>
+        <span><span class="swatch" style="background:var(--op-sierratel)"></span>SierraTel</span>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin-top:9px">Daily CELL_AVAILABILITY per operator — one of 40+ KPIs maintained continuously. Illustrative week.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 6 · COMPLIANCE ══ -->
+<section class="slide" data-title="Compliance">
+  <div class="secnum">Section 2</div>
+  <div class="eyebrow">Compliance Management</div>
+  <h2>Automated threshold evaluation and enforcement</h2>
+  <div class="row flexgrow" style="margin-top:18px">
+    <div class="panel col fadein d1">
+      <h3>KPI compliance by operator · current period</h3>
+      <div class="stackrow"><span class="name">Orange</span>
+        <div class="track"><div class="seg" style="--w:95.2%;background:var(--good)"></div><div class="seg" style="--w:4.8%;background:var(--crit)"></div></div>
+        <span class="meta">2 / 42 failed</span></div>
+      <div class="stackrow"><span class="name">Africell</span>
+        <div class="track"><div class="seg" style="--w:91.7%;background:var(--good)"></div><div class="seg" style="--w:8.3%;background:var(--crit)"></div></div>
+        <span class="meta">3 / 36 failed</span></div>
+      <div class="stackrow"><span class="name">Qcell</span>
+        <div class="track"><div class="seg" style="--w:80%;background:var(--good)"></div><div class="seg" style="--w:20%;background:var(--crit)"></div></div>
+        <span class="meta">6 / 30 failed</span></div>
+      <div class="stackrow" style="margin-bottom:0"><span class="name">SierraTel</span>
+        <div class="track"><div class="seg" style="--w:56.7%;background:var(--good)"></div><div class="seg" style="--w:43.3%;background:var(--crit)"></div></div>
+        <span class="meta">13 / 30 failed</span></div>
+      <div class="legend" style="margin-top:15px">
+        <span><span class="swatch" style="background:var(--good)"></span>PASS</span>
+        <span><span class="swatch" style="background:var(--crit)"></span>FAIL</span>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin-top:9px">Live figures from the compliance matrix. Each failure automatically raises a violation alert and can open an enforcement case.</p>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:15px">
+      <div class="panel fadein d2">
+        <h3>Threshold logic</h3>
+        <p style="font-size:12.5px;color:var(--ink2);line-height:1.55">
+          Thresholds are set per KPI with comparator, required value and warning margin — and can be
+          scoped <strong style="color:var(--ink)">per operator and per technology</strong> (most specific rule wins).
+          Values within the margin raise a <span class="pill warn">WARNING</span>; breaches raise a
+          <span class="pill crit">VIOLATION</span> with an audit‑trailed alert.</p>
+      </div>
+      <div class="panel fadein d3 flexgrow">
+        <h3>Built‑in enforcement workflow</h3>
+        <div class="flowstep"><div class="n">1</div><div><b>Alert</b><p>KPI breach detected → violation alert with operator, period, measured vs required value.</p></div></div>
+        <div class="flowstep"><div class="n">2</div><div><b>Notice</b><p>Compliance notice issued to the operator from within the platform.</p></div></div>
+        <div class="flowstep"><div class="n">3</div><div><b>Case</b><p>Escalation to enforcement case — disputes, submission cycles and licence obligations tracked.</p></div></div>
+        <div class="flowstep" style="margin-bottom:0"><div class="n">4</div><div><b>Penalty</b><p>Penalties &amp; fines module closes the loop with a full documentary record.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 7 · NETWORK & COVERAGE ══ -->
+<section class="slide" data-title="Network">
+  <div class="secnum">Section 3</div>
+  <div class="eyebrow">Network &amp; Coverage</div>
+  <h2>National site and cell inventory</h2>
+  <div class="row flexgrow" style="margin-top:18px">
+    <div class="panel col fadein d1" style="display:flex;flex-direction:column;align-items:center">
+      <h3 style="align-self:flex-start">52,101 cells by technology</h3>
+      <svg viewBox="0 0 220 220" width="210" style="margin:auto">
+        <g transform="rotate(-90 110 110)">
+          <circle cx="110" cy="110" r="80" fill="none" stroke="#E7EEF6" stroke-width="30"/>
+          <circle class="donutseg" cx="110" cy="110" r="80" fill="none" stroke="#1565C0" stroke-width="30"
+            stroke-dasharray="279.9 502.7" stroke-dashoffset="502.7" data-off="0"/>
+          <circle class="donutseg" cx="110" cy="110" r="80" fill="none" stroke="#E8710A" stroke-width="30"
+            stroke-dasharray="152.1 502.7" stroke-dashoffset="502.7" data-off="-281.9"/>
+          <circle class="donutseg" cx="110" cy="110" r="80" fill="none" stroke="#0E9F6E" stroke-width="30"
+            stroke-dasharray="63.8 502.7" stroke-dashoffset="502.7" data-off="-436"/>
+        </g>
+        <text x="110" y="104" text-anchor="middle" fill="#0D3C7A" font-size="24" font-weight="800">52,101</text>
+        <text x="110" y="123" text-anchor="middle" fill="#8595AD" font-size="11">cells</text>
+      </svg>
+      <div class="legend" style="justify-content:center">
+        <span><span class="swatch" style="background:#1565C0"></span>3G — 29,013</span>
+        <span><span class="swatch" style="background:#E8710A"></span>2G — 15,767</span>
+        <span><span class="swatch" style="background:#0E9F6E"></span>4G — 6,820</span>
+        <span><span class="swatch" style="background:#94A3B8"></span>Other — 501</span>
+      </div>
+    </div>
+    <div class="panel col fadein d2">
+      <h3>Sites by operator</h3>
+      <div class="hbar"><span class="name">Orange</span><div class="track" style="height:25px"><div class="fill" style="--w:100%;background:var(--op-orange)"></div></div><span class="val">651</span></div>
+      <div class="hbar"><span class="name">Africell</span><div class="track" style="height:25px"><div class="fill" style="--w:86%;background:var(--op-africell)"></div></div><span class="val">560</span></div>
+      <div class="hbar"><span class="name">Qcell</span><div class="track" style="height:25px"><div class="fill" style="--w:63%;background:var(--op-qcell)"></div></div><span class="val">410</span></div>
+      <div class="hbar"><span class="name">SierraTel</span><div class="track" style="height:25px"><div class="fill" style="--w:34%;background:var(--op-sierratel)"></div></div><span class="val">220</span></div>
+      <p style="font-size:12.5px;color:var(--ink2);line-height:1.55;margin-top:15px">
+        Site and cell inventory is imported per operator with coordinates, technology and status. It powers
+        coverage maps, nearest‑site lookups in drive‑test analysis, and footprint comparisons —
+        <strong style="color:var(--ink)">the regulator's single source of truth</strong> for who has built what, where.</p>
+      <div style="margin-top:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <span class="chip">Interactive national map</span>
+        <span class="chip">Per‑district drill‑down</span>
+        <span class="chip">Technology filters</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 8 · DRIVE TESTING I ══ -->
+<section class="slide" data-title="Drive test — methodology">
+  <div class="secnum">Section 4 · Part 1 of 2</div>
+  <div class="eyebrow">Drive Testing</div>
+  <h2>Independent field measurement methodology</h2>
+  <div class="row flexgrow" style="margin-top:14px">
+    <div class="col" style="flex:1.35">
+      <div class="panel fadein d1" style="padding:12px">
+        <h3 style="margin-bottom:8px">Cluster coverage map · Bo, Southern Province (3G RSCP)</h3>
+        <div class="maproute">
+        <svg viewBox="0 0 560 244" width="100%">
+          <rect width="560" height="244" fill="#EEEAE0"/>
+          <g stroke="#DED7C7" stroke-width="7" fill="none" stroke-linecap="round">
+            <path d="M20 82 C120 64 200 102 300 88 S480 64 545 78"/>
+            <path d="M60 18 C90 82 120 156 100 232"/>
+            <path d="M200 14 C215 82 230 166 260 236"/>
+            <path d="M340 18 C350 92 330 176 355 232"/>
+            <path d="M20 174 C140 160 300 184 545 166"/>
+          </g>
+          <g class="maplabel">
+            <text x="66" y="48">BO TOWN</text><text x="248" y="60">MESSIMA</text>
+            <text x="420" y="120">KORTUMAHUN</text><text x="120" y="206">GOMA TOWN</text>
+            <text x="330" y="218">GBONDO TOWN</text>
+          </g>
+          <g id="trail"></g>
+          <g class="mapdot" style="animation-delay:1.15s">
+            <circle cx="262" cy="112" r="9" fill="rgba(210,63,58,.32)" stroke="#D23F3A" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="262" y="96" text-anchor="middle" class="warnlabel">⚠ SL0258_MESIMA_2_RELIEF</text>
+          </g>
+          <g class="mapdot" style="animation-delay:1.3s">
+            <circle cx="452" cy="168" r="9" fill="rgba(210,63,58,.32)" stroke="#D23F3A" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="452" y="152" text-anchor="middle" class="warnlabel">⚠ SL0061_GORIMA</text>
+          </g>
+        </svg>
+        </div>
+        <div class="legend" style="margin-top:8px">
+          <span><span class="swatch" style="background:#1E8E4E;border-radius:50%"></span>Good ≥ −85</span>
+          <span><span class="swatch" style="background:#D4A017;border-radius:50%"></span>Fair −85 to −95</span>
+          <span><span class="swatch" style="background:#E8710A;border-radius:50%"></span>Poor −95 to −105</span>
+          <span><span class="swatch" style="background:#C0392B;border-radius:50%"></span>Bad &lt; −105</span>
+          <span style="color:var(--crit)">⚠ auto‑detected problem area</span>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:13px">
+      <div class="panel fadein d2">
+        <h3>How campaigns are structured</h3>
+        <div class="flowstep"><div class="n">◎</div><div><b>Per cluster, operator &amp; technology</b><p>Routes grouped into named clusters (e.g. Bo_CL01); every measurement is GPS‑tagged.</p></div></div>
+        <div class="flowstep" style="margin-bottom:0"><div class="n">▤</div><div><b>Every sample geolocated</b><p>Latitude, longitude, serving cell and signal metrics captured continuously along the route.</p></div></div>
+      </div>
+      <div class="panel fadein d3">
+        <h3>Metrics captured per technology</h3>
+        <div class="scrollx"><table>
+          <thead><tr><th>Tech</th><th>Coverage</th><th>Quality</th><th>Speed</th></tr></thead>
+          <tbody>
+            <tr><td>2G / GSM</td><td>RxLevel</td><td>RxQual</td><td>—</td></tr>
+            <tr><td>3G / WCDMA</td><td>RSCP</td><td>Ec/No</td><td>DL / UL</td></tr>
+            <tr><td>4G / LTE</td><td>RSRP</td><td>RSRQ · SINR</td><td>DL / UL</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="panel fadein d4">
+        <h3>Campaign scale to date</h3>
+        <div class="dtmetric"><span class="k">Total drive tests</span><span class="v">639</span></div>
+        <div class="dtmetric"><span class="k">Distance measured</span><span class="v">807.3 km</span></div>
+        <div class="dtmetric"><span class="k">Signal samples</span><span class="v">245,166</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 9 · DRIVE TESTING II ══ -->
+<section class="slide" data-title="Drive test — analysis">
+  <div class="secnum">Section 4 · Part 2 of 2</div>
+  <div class="eyebrow">Drive Testing</div>
+  <h2>Signal metrics, distribution analysis and quality indicators</h2>
+  <div class="row" style="margin-top:14px">
+    <div class="panel col fadein d1 scrollx" style="flex:1.5">
+      <h3>Campaign summary · live production data</h3>
+      <table>
+        <thead><tr><th>Operator</th><th class="num">Tests</th><th class="num">Samples</th><th class="num">Distance</th>
+          <th class="num">Avg signal</th><th class="num">Avg SINR</th><th class="num">Avg DL</th><th class="num">Signal compliance</th></tr></thead>
+        <tbody>
+          <tr><td><span class="swatch" style="background:var(--op-orange);display:inline-block;margin-right:6px"></span>Orange</td><td class="num">225</td><td class="num">84,463</td><td class="num">277.0 km</td><td class="num">−91.9 dBm</td><td class="num">14.6 dB</td><td class="num">3,784 kbps</td><td class="num">33.1%</td></tr>
+          <tr><td><span class="swatch" style="background:var(--op-africell);display:inline-block;margin-right:6px"></span>Africell</td><td class="num">251</td><td class="num">94,418</td><td class="num">316.6 km</td><td class="num">−91.6 dBm</td><td class="num">12.7 dB</td><td class="num">4,339 kbps</td><td class="num">20.9%</td></tr>
+          <tr><td><span class="swatch" style="background:var(--op-qcell);display:inline-block;margin-right:6px"></span>Qcell</td><td class="num">163</td><td class="num">66,285</td><td class="num">213.7 km</td><td class="num">−89.7 dBm</td><td class="num">6.5 dB</td><td class="num">910 kbps</td><td class="num">26.9%</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:11px;color:var(--ink3);margin-top:10px;margin-bottom:0;font-style:italic">
+        * Note: Orange has 651 active sites, with Africell holding a footprint below that level. Sierra Tel has no active drive test log data for the reporting period, and is therefore excluded from the benchmarking metrics.
+      </p>
+      <h3 style="margin-top:18px">Signal distribution &amp; percentiles · Orange 3G (Bo_CL01)</h3>
+      <div class="row" style="gap:18px;align-items:center">
+        <div style="flex:1.2">
+          <div class="stackrow" style="grid-template-columns:74px 1fr 42px"><span class="name">Excellent</span><div class="track"><div class="seg" style="--w:14%;background:#1E8E4E"></div></div><span class="meta">14%</span></div>
+          <div class="stackrow" style="grid-template-columns:74px 1fr 42px"><span class="name">Good</span><div class="track"><div class="seg" style="--w:31%;background:#5BA84F"></div></div><span class="meta">31%</span></div>
+          <div class="stackrow" style="grid-template-columns:74px 1fr 42px"><span class="name">Fair</span><div class="track"><div class="seg" style="--w:23%;background:#D4A017"></div></div><span class="meta">23%</span></div>
+          <div class="stackrow" style="grid-template-columns:74px 1fr 42px"><span class="name">Poor</span><div class="track"><div class="seg" style="--w:20%;background:#E8710A"></div></div><span class="meta">20%</span></div>
+          <div class="stackrow" style="grid-template-columns:74px 1fr 42px;margin-bottom:0"><span class="name">No signal</span><div class="track"><div class="seg" style="--w:12%;background:#C0392B"></div></div><span class="meta">12%</span></div>
+        </div>
+        <div style="flex:1">
+          <table style="font-size:12.5px"><thead><tr><th>Percentile</th><th class="num">RSCP</th></tr></thead>
+            <tbody>
+              <tr><td>P5</td><td class="num">−107 dBm</td></tr>
+              <tr><td>P25</td><td class="num">−99 dBm</td></tr>
+              <tr><td>P50 (median)</td><td class="num">−92 dBm</td></tr>
+              <tr><td>P90</td><td class="num">−79 dBm</td></tr>
+              <tr><td>P95</td><td class="num">−74 dBm</td></tr>
+            </tbody></table>
+          <p style="font-size:10.5px;color:var(--ink3);margin-top:5px">ETSI EG 202 057 cumulative distribution. Values illustrative of output format.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel fadein d2">
+        <h3>Technology‑aware thresholds</h3>
+        <div class="dtmetric"><span class="k">2G coverage (RxLevel)</span><span class="v">≥ −85 dBm</span></div>
+        <div class="dtmetric"><span class="k">3G coverage (RSCP)</span><span class="v">≥ −90 dBm</span></div>
+        <div class="dtmetric"><span class="k">4G coverage (RSRP)</span><span class="v">≥ −100 dBm</span></div>
+        <div class="dtmetric"><span class="k">4G quality (SINR)</span><span class="v">≥ 5 dB</span></div>
+      </div>
+      <div class="panel fadein d3">
+        <h3>Analysis modules</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span class="chip">Cluster map</span><span class="chip">Dead zones</span>
+          <span class="chip">Route / corridor</span><span class="chip">PCI analysis</span>
+          <span class="chip">Regional analysis</span><span class="chip">Campaign trend</span>
+          <span class="chip">Executive view</span><span class="chip">Operator comparison</span>
+        </div>
+      </div>
+      <div class="panel fadein d4">
+        <h3>Voice quality indicators</h3>
+        <p style="font-size:12px;color:var(--ink2);line-height:1.5">On‑route call events yield
+          <strong style="color:var(--ink)">CSSR</strong> (call setup success) and
+          <strong style="color:var(--ink)">CDR</strong> (call drop rate) per operator, plus automatic
+          <strong style="color:var(--ink)">dead‑zone</strong> and <strong style="color:var(--ink)">named
+          problem‑area</strong> detection for corrective directives.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 10 · OPERATORS & QOE ══ -->
+<section class="slide" data-title="Operators & QoE">
+  <div class="secnum">Section 5</div>
+  <div class="eyebrow">Operators &amp; Quality of Experience</div>
+  <h2>Per‑operator dashboards and comparison</h2>
+  <div class="row flexgrow" style="margin-top:16px">
+    <div class="panel col fadein d1" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <h3 style="align-self:flex-start">Operator QoS radar · drive‑test derived</h3>
+      <svg viewBox="0 0 340 290" width="100%" style="max-width:380px">
+        <g stroke="#DCE6F2" fill="none">
+          <polygon points="170,40 293,129 246,274 94,274 47,129"/>
+          <polygon points="170,73 262,140 227,248 113,248 78,140"/>
+          <polygon points="170,106 232,151 208,222 132,222 108,151"/>
+          <polygon points="170,139 201,162 189,196 151,196 139,162"/>
+          <line x1="170" y1="172" x2="170" y2="40"/><line x1="170" y1="172" x2="293" y2="129"/>
+          <line x1="170" y1="172" x2="246" y2="274"/><line x1="170" y1="172" x2="94" y2="274"/>
+          <line x1="170" y1="172" x2="47" y2="129"/>
+        </g>
+        <g fill="#47597A" font-size="11" font-weight="600">
+          <text x="170" y="28" text-anchor="middle">RSRP</text>
+          <text x="305" y="126" text-anchor="start">Compliance</text>
+          <text x="252" y="292" text-anchor="middle">SINR</text>
+          <text x="88" y="292" text-anchor="middle">Throughput</text>
+          <text x="34" y="126" text-anchor="end">Coverage</text>
+        </g>
+        <polygon class="radarpoly" points="170,66 273,136 216,242 122,238 87,140" fill="rgba(124,58,237,.16)" stroke="#7C3AED" stroke-width="2"/>
+        <polygon class="radarpoly r2" points="170,80 283,132 232,252 138,224 98,146" fill="rgba(232,113,10,.14)" stroke="#E8710A" stroke-width="2"/>
+        <polygon class="radarpoly r3" points="170,94 253,142 200,224 146,244 108,152" fill="rgba(14,159,110,.14)" stroke="#0E9F6E" stroke-width="2"/>
+      </svg>
+      <div class="legend" style="justify-content:center">
+        <span><span class="swatch" style="background:var(--op-africell)"></span>Africell</span>
+        <span><span class="swatch" style="background:var(--op-orange)"></span>Orange</span>
+        <span><span class="swatch" style="background:var(--op-qcell)"></span>Qcell</span>
+      </div>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel fadein d2">
+        <h3>Per‑operator command view</h3>
+        <p style="font-size:13px;color:var(--ink2);line-height:1.6">
+          Each operator has a dedicated dashboard: KPI trends, compliance history, drive‑test scores,
+          regional breakdowns and complaint volumes — the full quality picture on one screen for licence reviews.</p>
+      </div>
+      <div class="panel fadein d3">
+        <h3>Network KPIs vs experienced QoE</h3>
+        <p style="font-size:13px;color:var(--ink2);line-height:1.6">
+          Network KPIs show what the equipment did; QoE data — complaint streams, call‑drop reports,
+          throughput on real handsets — shows what the <strong style="color:var(--ink)">citizen experienced</strong>.
+          Both sit on the same axis, so a "green" network with dissatisfied subscribers is flagged for investigation.</p>
+      </div>
+      <div class="panel fadein d4">
+        <h3>Regional analysis</h3>
+        <p style="font-size:13px;color:var(--ink2);line-height:1.6">
+          QoS scores and coverage compliance per province — Western Area, Northern, Southern, Eastern —
+          sample‑weighted, making rural service gaps visible alongside Freetown's figures.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 11 · REPORT MANAGEMENT ══ -->
+<section class="slide" data-title="Reports">
+  <div class="secnum">Section 6</div>
+  <div class="eyebrow">Report Management</div>
+  <h2>Regulatory report generation and export</h2>
+  <div class="row flexgrow" style="margin-top:16px">
+    <div class="panel col fadein d1" style="flex:1.1">
+      <h3>Anatomy of a drive‑test cluster report</h3>
+      <div class="flowstep"><div class="n">§1</div><div><b>Cover &amp; geography</b><p>Cluster, district, province, operators, technologies and campaign dates.</p></div></div>
+      <div class="flowstep"><div class="n">§2</div><div><b>Coverage maps</b><p>Interactive maps embedded per technology — sample trails, problem areas, dead zones.</p></div></div>
+      <div class="flowstep"><div class="n">§3</div><div><b>Distributions &amp; percentiles</b><p>Signal classification tables, pass rates vs licence thresholds, P5–P95, CSSR / CDR.</p></div></div>
+      <div class="flowstep"><div class="n">§4</div><div><b>Auto‑written remarks</b><p>Status verdict — SATISFACTORY / BELOW TARGET / CRITICAL — with named locations needing improvement.</p></div></div>
+      <div class="flowstep" style="margin-bottom:0"><div class="n">§5</div><div><b>Dead‑zone annex</b><p>Severity‑ranked list (Critical / Severe / Poor) for mandatory operator corrective action.</p></div></div>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel fadein d2">
+        <h3>Formats &amp; generation</h3>
+        <div class="row" style="gap:12px">
+          <div style="flex:1;text-align:center;background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:11px">
+            <div style="font-size:19px">📄</div><b style="font-size:12.5px;color:var(--ink)">PDF</b>
+            <p style="font-size:10.5px;color:var(--ink3);margin-top:2px">Board &amp; operator‑ready, maps embedded</p></div>
+          <div style="flex:1;text-align:center;background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:11px">
+            <div style="font-size:19px">📊</div><b style="font-size:12.5px;color:var(--ink)">Excel</b>
+            <p style="font-size:10.5px;color:var(--ink3);margin-top:2px">Analyst workbooks, per‑KPI sheets</p></div>
+        </div>
+        <p style="font-size:11.5px;color:var(--ink3);margin-top:9px">Generated server‑side from the same live data — one click, no manual assembly.</p>
+      </div>
+      <div class="panel fadein d3 flexgrow scrollx">
+        <h3>Report catalogue</h3>
+        <table>
+          <thead><tr><th>Report</th><th>Audience</th><th>Formats</th></tr></thead>
+          <tbody>
+            <tr><td>Drive‑test cluster report</td><td>Operators / Board</td><td>PDF · HTML</td></tr>
+            <tr><td>Regional QoS analysis</td><td>Board / Ministry</td><td>PDF · Excel</td></tr>
+            <tr><td>Compliance matrix</td><td>Enforcement</td><td>Excel</td></tr>
+            <tr><td>Executive summary</td><td>Director General</td><td>PDF</td></tr>
+            <tr><td>Campaign trend report</td><td>Technical unit</td><td>PDF · Excel</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 12 · AI FEATURES ══ -->
+<section class="slide" data-title="AI">
+  <div class="secnum">Section 7</div>
+  <div class="eyebrow">AI Features</div>
+  <h2>Assisted analysis and recommendations</h2>
+  <div class="row flexgrow" style="margin-top:16px">
+    <div class="panel col fadein d1">
+      <h3>Auto‑generated remark · output style</h3>
+      <div style="background:var(--soft);border-left:4px solid var(--warn);border-radius:8px;padding:14px 16px;font-size:12.5px;line-height:1.65;color:var(--ink2)">
+        <b style="color:#A66300">Remarks — BELOW TARGET</b><br>
+        Orange's 3G network coverage in Bo_CL01. Coverage signal strength
+        (RSCP ≥ −90 dBm → <b style="color:var(--ink)">68.4%</b>).
+        <b style="color:var(--ink)">Coverage falls short of threshold — improvement is needed at:
+        SL0258_MESIMA_2_RELIEF (avg −103.2 dBm), SL0061_GORIMA (avg −101.7 dBm)</b>.
+        Ec/No between −17.5 dB and −4.2 dB, accounts for 71.2% meeting threshold.
+        RSCP ≥ −90 dBm is required for quality connection.
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin-top:9px">Generated from the measured distribution, licence thresholds and detected problem clusters — no analyst typing required. Figures illustrative of output format.</p>
+    </div>
+    <div class="col" style="display:flex;flex-direction:column;gap:13px">
+      <div class="panel fadein d2">
+        <h3>Problem‑area intelligence</h3>
+        <p style="font-size:12.5px;color:var(--ink2);line-height:1.55">Grid clustering finds the worst coverage
+          pockets and names them — nearest inventory site for Orange, reverse‑geocoded
+          <strong style="color:var(--ink)">street and neighbourhood names</strong> where no inventory exists —
+          so directives cite places, not coordinates.</p>
+      </div>
+      <div class="panel fadein d3">
+        <h3>AI recommendations feed</h3>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:12px">
+          <div style="background:rgba(210,63,58,.07);border:1px solid rgba(210,63,58,.22);border-radius:8px;padding:9px 11px">
+            <b style="color:#B7332E">SierraTel has 13 KPI failure(s)</b>
+            <span style="color:var(--ink3)"> — 13 of 30 KPIs failed compliance thresholds.</span></div>
+          <div style="background:rgba(199,119,0,.07);border:1px solid rgba(199,119,0,.22);border-radius:8px;padding:9px 11px">
+            <b style="color:#A66300">Qcell has 6 KPI failure(s)</b>
+            <span style="color:var(--ink3)"> — 6 of 30 KPIs failed compliance thresholds.</span></div>
+          <div style="background:rgba(30,142,78,.07);border:1px solid rgba(30,142,78,.22);border-radius:8px;padding:9px 11px">
+            <b style="color:#157A40">Africell leads QoS ranking</b>
+            <span style="color:var(--ink3)"> — score 98.8, highest among 4 operators.</span></div>
+        </div>
+      </div>
+      <div class="panel fadein d4">
+        <h3>Natural‑language assistant</h3>
+        <p style="font-size:12.5px;color:var(--ink2);line-height:1.55">Ask the platform in plain language —
+          "which operator failed availability in the Southern Province last month?" — and receive answers
+          grounded in the live database.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 13 · MOBILE APP OVERVIEW ══ -->
+<section class="slide" data-title="Mobile app">
+  <div class="secnum">Section 8</div>
+  <div class="eyebrow" style="color:var(--op-orange)">QoS Complaint Mobile Application</div>
+  <h2>Citizen reporting channel and QoE data source</h2>
+  <div class="row flexgrow" style="margin-top:16px;align-items:center;gap:40px">
+    <div class="col">
+      <p class="lede" style="font-size:16px;color:var(--ink2)">
+        Drive tests measure the network a few days a year; citizens experience it every minute. The
+        QoS Complaint application gives every verified subscriber a structured channel to the regulator,
+        and gives NatCA a continuous, geolocated stream of quality‑of‑experience data.</p>
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:11px">
+        <div class="flowstep fadein d1"><div class="n">✓</div><div><b>KYC‑verified identities</b><p>National ID + selfie match at registration. Every complaint is attributable — no anonymous noise.</p></div></div>
+        <div class="flowstep fadein d2"><div class="n">✓</div><div><b>Structured complaints</b><p>Operator, category, description, GPS position and automatic signal readings captured at filing.</p></div></div>
+        <div class="flowstep fadein d3"><div class="n">✓</div><div><b>Closed feedback loop</b><p>Statuses flow back to the citizen: received → forwarded to operator → resolved.</p></div></div>
+        <div class="flowstep fadein d4" style="margin-bottom:0"><div class="n">✓</div><div><b>Feeds TNIP‑R directly</b><p>Complaint density overlays the coverage map — where measured problems and citizen reports coincide.</p></div></div>
+      </div>
+    </div>
+    <div class="simstage fadein d2" style="flex:0 0 260px">
+      <div class="phone"><div class="pscreen">
+        <div class="appscr on" style="text-align:center;justify-content:center">
+          <div style="font-size:36px;margin-bottom:10px">📶</div>
+          <b style="font-size:15px;color:var(--brand-dark)">QoS Complaint</b>
+          <p style="font-size:10px;color:var(--ink3);margin-top:5px;line-height:1.5">National Communications Authority<br>Republic of Sierra Leone</p>
+          <div style="margin-top:18px;display:flex;flex-direction:column;gap:7px">
+            <div class="abtn" style="margin:0">File a complaint</div>
+            <div class="abtn ghost" style="margin:0">Track my complaints</div>
+            <div class="abtn ghost" style="margin:0">Network coverage near me</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="simcap">The citizen home screen</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 14 · DEMO KYC ══ -->
+<section class="slide" data-title="Demo · KYC">
+  <div class="secnum">Section 8 · Demonstration 1 of 2</div>
+  <div class="eyebrow" style="color:var(--op-orange)">QoS Complaint Application · Live Simulation</div>
+  <h2>Registration and KYC verification</h2>
+  <div class="row flexgrow" style="margin-top:12px;align-items:center;justify-content:center;gap:52px">
+    <div class="simstage">
+      <div class="phone"><div class="pscreen" id="kycphone">
+        <div class="tapdot" id="kyctap"></div>
+        <div class="appscr on" data-s="0">
+          <div class="stepdots"><i class="done"></i><i></i><i></i><i></i></div>
+          <div class="appbar">Create your account</div>
+          <div class="ffield"><span class="flabel">Full name</span><span class="fval" id="kf-name"></span></div>
+          <div class="ffield"><span class="flabel">Phone number</span><span class="fval" id="kf-phone"></span></div>
+          <div class="ffield"><span class="flabel">Network operator</span><span class="fval" id="kf-op"></span></div>
+          <div class="abtn" id="kbtn0">Continue</div>
+        </div>
+        <div class="appscr" data-s="1">
+          <div class="stepdots"><i class="done"></i><i class="done"></i><i></i><i></i></div>
+          <div class="appbar"><span class="back">‹</span> Identity verification</div>
+          <p style="font-size:10px;color:var(--ink3);margin-bottom:8px">Place your national ID inside the frame</p>
+          <div class="idcard" id="idcard">
+            <div class="scanline"></div>
+            <div style="font-size:24px">🪪</div>
+            <span id="idstatus">Position your ID card…</span>
+          </div>
+          <div class="progressbar"><i id="idprog"></i></div>
+          <div class="abtn" id="kbtn1" style="opacity:.4">Capture</div>
+        </div>
+        <div class="appscr" data-s="2">
+          <div class="stepdots"><i class="done"></i><i class="done"></i><i class="done"></i><i></i></div>
+          <div class="appbar"><span class="back">‹</span> Selfie match</div>
+          <p style="font-size:10px;color:var(--ink3)">Look straight at the camera</p>
+          <div id="selfbox"><div class="selfiecircle">🙂</div></div>
+          <p style="font-size:10px;color:var(--ink3);text-align:center" id="selfstatus">Hold still…</p>
+          <div class="abtn" style="opacity:.4">Verify</div>
+        </div>
+        <div class="appscr" data-s="3" style="text-align:center;justify-content:center">
+          <div class="checkmark"><svg viewBox="0 0 32 32"><path d="M7 17 L13 23 L25 9"/></svg></div>
+          <b style="font-size:14px;color:#157A40">Identity verified</b>
+          <p style="font-size:10px;color:var(--ink3);margin-top:7px;line-height:1.6">
+            Welcome, <b style="color:var(--ink)">Fatmata Kamara</b><br>
+            NIN ····‑··42 matched · Africell +232 77 ··· 118</p>
+          <div class="abtn" style="margin-top:18px">Start using the app</div>
+        </div>
+      </div></div>
+      <div class="simcap" id="kyccap">Step 1 · Citizen enters basic details</div>
+    </div>
+    <div class="col" style="max-width:430px">
+      <div class="panel fadein d1">
+        <h3>Why KYC matters to a regulator</h3>
+        <div class="flowstep"><div class="n">1</div><div><b>Sign‑up</b><p>Name, phone number and home operator — auto‑detected from the SIM.</p></div></div>
+        <div class="flowstep"><div class="n">2</div><div><b>National ID capture</b><p>Camera capture with on‑device quality checks; number validated against format rules.</p></div></div>
+        <div class="flowstep"><div class="n">3</div><div><b>Selfie liveness match</b><p>Face match against the ID photo blocks impersonation and bot accounts.</p></div></div>
+        <div class="flowstep" style="margin-bottom:0"><div class="n">4</div><div><b>Verified citizen</b><p>Every complaint now carries a real identity — evidence an operator cannot dismiss as spam.</p></div></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin-top:11px">▶ The simulation loops automatically — data shown is fictional demonstration data.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 15 · DEMO COMPLAINT ══ -->
+<section class="slide" data-title="Demo · Complaint">
+  <div class="secnum">Section 8 · Demonstration 2 of 2</div>
+  <div class="eyebrow" style="color:var(--op-orange)">QoS Complaint Application · Live Simulation</div>
+  <h2>Complaint submission and status tracking</h2>
+  <div class="row flexgrow" style="margin-top:12px;align-items:center;justify-content:center;gap:52px">
+    <div class="col" style="max-width:430px">
+      <div class="panel fadein d1">
+        <h3>What reaches the regulator</h3>
+        <div class="scrollx"><table style="font-size:12.5px">
+          <tbody>
+            <tr><td>Complainant</td><td>Fatmata Kamara · verified</td></tr>
+            <tr><td>Operator</td><td><span class="swatch" style="background:var(--op-orange);display:inline-block;margin-right:6px"></span>Orange SL</td></tr>
+            <tr><td>Category</td><td>No data connection</td></tr>
+            <tr><td>Location</td><td>Mesima Rd, Bo · 7.9564°N 11.7383°W</td></tr>
+            <tr><td>Auto‑captured</td><td>RSCP −104 dBm · 3G · cell 0666‑12</td></tr>
+            <tr><td>Status</td><td><span class="pill warn">FORWARDED TO OPERATOR</span></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="panel fadein d2" style="margin-top:13px">
+        <h3>The aggregate value</h3>
+        <p style="font-size:12.5px;color:var(--ink2);line-height:1.55">
+          One complaint is an anecdote. <strong style="color:var(--ink)">Two hundred complaints on the same
+          street corner, plotted on the same map as a failed drive test,</strong> constitute a regulatory
+          case file supported by independent evidence.</p>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin-top:11px">▶ The simulation loops automatically — data shown is fictional demonstration data.</p>
+    </div>
+    <div class="simstage">
+      <div class="phone"><div class="pscreen" id="cmpphone">
+        <div class="tapdot" id="cmptap"></div>
+        <div class="appscr on" data-s="0">
+          <div class="appbar">New complaint · 1/3</div>
+          <p style="font-size:10px;color:var(--ink3);margin-bottom:7px">Which operator is this about?</p>
+          <div class="opchoice" id="opc0"><span class="dot" style="background:var(--op-orange)"></span>Orange SL</div>
+          <div class="opchoice"><span class="dot" style="background:var(--op-africell)"></span>Africell</div>
+          <div class="opchoice"><span class="dot" style="background:var(--op-qcell)"></span>Qcell</div>
+          <div class="opchoice"><span class="dot" style="background:var(--op-sierratel)"></span>SierraTel</div>
+          <div class="abtn" id="cbtn0">Next</div>
+        </div>
+        <div class="appscr" data-s="1">
+          <div class="appbar"><span class="back">‹</span> New complaint · 2/3</div>
+          <p style="font-size:10px;color:var(--ink3);margin-bottom:7px">What went wrong?</p>
+          <div class="opchoice">📞 Dropped calls</div>
+          <div class="opchoice" id="opc1">📵 No data connection</div>
+          <div class="opchoice">🐌 Very slow internet</div>
+          <div class="opchoice">💬 SMS not delivered</div>
+          <div class="ffield" style="margin-top:4px"><span class="flabel">Describe (optional)</span><span class="fval" id="cf-desc"></span></div>
+          <div class="abtn" id="cbtn1">Next</div>
+        </div>
+        <div class="appscr" data-s="2">
+          <div class="appbar"><span class="back">‹</span> New complaint · 3/3</div>
+          <div style="border-radius:9px;overflow:hidden;margin-bottom:7px;border:1px solid var(--line)">
+            <svg viewBox="0 0 218 112" width="100%" style="display:block;background:#EEEAE0">
+              <g stroke="#DED7C7" stroke-width="5" fill="none">
+                <path d="M0 56 C60 46 140 66 218 51"/><path d="M80 0 C90 38 85 76 95 112"/><path d="M150 0 C155 48 145 86 160 112"/>
+              </g>
+              <text x="16" y="22" class="maplabel">MESIMA RD</text>
+              <text x="120" y="98" class="maplabel">BO TOWN</text>
+              <g><circle cx="105" cy="54" r="12" fill="rgba(21,101,192,.22)">
+                  <animate attributeName="r" values="8;15;8" dur="1.6s" repeatCount="indefinite"/></circle>
+                <circle cx="105" cy="54" r="5" fill="#1565C0" stroke="#fff" stroke-width="1.5"/></g>
+            </svg>
+          </div>
+          <div class="ffield"><span class="flabel">Detected location</span><span class="fval" style="font-size:10px">Mesima Rd, Bo · GPS locked ✓</span></div>
+          <div class="ffield"><span class="flabel">Signal snapshot (auto)</span><span class="fval" style="font-size:10px">RSCP −104 dBm · 3G</span></div>
+          <div class="abtn" id="cbtn2">Submit complaint</div>
+        </div>
+        <div class="appscr" data-s="3">
+          <div class="checkmark" style="margin:5px auto"><svg viewBox="0 0 32 32"><path d="M7 17 L13 23 L25 9"/></svg></div>
+          <b style="font-size:12.5px;text-align:center;color:#157A40">Complaint #SL‑2026‑04418 filed</b>
+          <p style="font-size:9.5px;color:var(--ink3);text-align:center;margin:5px 0 9px">You'll be notified at every step</p>
+          <div class="statustrack">
+            <div class="stnode done"><span class="ic">✓</span><span><b style="color:var(--ink)">Received by NatCA</b><br>19 Jul · 10:42</span></div>
+            <div style="margin-left:6px;width:2px;height:13px;background:var(--good)"></div>
+            <div class="stnode done"><span class="ic">✓</span><span><b style="color:var(--ink)">Forwarded to Orange SL</b><br>19 Jul · 10:44</span></div>
+            <div style="margin-left:6px;width:2px;height:13px;background:#D3E0F0"></div>
+            <div class="stnode now"><span class="ic">…</span><span><b style="color:var(--ink)">Operator investigating</b><br>SLA: response within 48 h</span></div>
+            <div style="margin-left:6px;width:2px;height:13px;background:#D3E0F0"></div>
+            <div class="stnode"><span class="ic"></span><span>Resolution &amp; citizen feedback</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="simcap" id="cmpcap">Step 1 · Citizen selects the operator</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 16 · NEXT STEPS ══ -->
+<section class="slide hero" data-title="Next steps">
+  <div style="position:relative;z-index:2;max-width:920px">
+    <div class="eyebrow">Recommendation</div>
+    <h1 style="font-size:clamp(30px,3.8vw,48px)">Proposed next steps</h1>
+    <div class="grid3" style="margin-top:32px;max-width:840px">
+      <div class="stat fadein d1"><div class="v">40+</div><div class="l">KPIs computed independently</div></div>
+      <div class="stat o2 fadein d2"><div class="v">807 km</div><div class="l">Streets already measured</div></div>
+      <div class="stat o3 fadein d3"><div class="v">4</div><div class="l">Operators live on the platform</div></div>
+    </div>
+    <div style="margin-top:28px;display:flex;flex-direction:column;gap:13px;max-width:700px">
+      <div class="flowstep fadein d2"><div class="n">1</div><div><b>Hands‑on technical walkthrough</b><p>A working session with NatCA's technical unit on the live platform with current Sierra Leone data.</p></div></div>
+      <div class="flowstep fadein d3"><div class="n">2</div><div><b>Scoped pilot</b><p>A pilot in one province — drive‑test campaign, compliance run, and a citizen‑app rollout to a sample group.</p></div></div>
+      <div class="flowstep fadein d4" style="margin-bottom:0"><div class="n">3</div><div><b>Rollout plan</b><p>Phased national deployment with training, data‑governance and reporting cadence agreed with the Authority.</p></div></div>
+    </div>
+    <div class="sig fadein d4" style="margin-top:24px">
+      <span class="chip" style="background:#fff;color:var(--brand-dark);border-color:#fff;font-size:13px;padding:8px 18px">Request the live walkthrough →</span>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<div class="brandtag">TNIP‑R · Consultant briefing</div>
+<div class="kbd-hint">← → arrow keys or buttons to navigate</div>
+<div class="chrome">
+  <span class="counter" id="counter">01 / 16</span>
+  <div class="dots" id="dots"></div>
+  <div class="navbtns">
+    <button id="prevb" aria-label="Previous slide">←</button>
+    <button id="nextb" aria-label="Next slide">→</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides=[...document.querySelectorAll('.slide')];
+  const dots=document.getElementById('dots');
+  const counter=document.getElementById('counter');
+  let cur=0;
+  slides.forEach((s,i)=>{const b=document.createElement('button');b.title=s.dataset.title;
+    b.onclick=()=>go(i);dots.appendChild(b)});
+  const dotBtns=[...dots.children];
+  function setCounter(){counter.textContent=String(cur+1).padStart(2,'0')+' / '+slides.length}
+  function go(n){
+    if(n<0||n>=slides.length)return;
+    slides[cur].classList.remove('active');
+    cur=n;
+    slides.forEach((s,i)=>s.classList.toggle('prev',i<cur));
+    slides[cur].classList.add('active');
+    dotBtns.forEach((d,i)=>d.classList.toggle('on',i===cur));
+    setCounter();
+    onSlideEnter(cur);
+  }
+  document.getElementById('prevb').onclick=()=>go(cur-1);
+  document.getElementById('nextb').onclick=()=>go(cur+1);
+  addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ')go(cur+1);
+    if(e.key==='ArrowLeft'||e.key==='PageUp')go(cur-1);
+    if(e.key==='Home')go(0); if(e.key==='End')go(slides.length-1);
+  });
+  dotBtns[0].classList.add('on');
+  setCounter();
+
+  function runTickers(root){
+    root.querySelectorAll('.ticker').forEach(el=>{
+      const target=+el.dataset.n, dur=1100, t0=performance.now();
+      function step(t){const p=Math.min(1,(t-t0)/dur);
+        el.textContent=Math.round(target*(1-Math.pow(1-p,3))).toLocaleString();
+        if(p<1)requestAnimationFrame(step)}
+      requestAnimationFrame(step);
+    });
+  }
+  function runDonut(root){root.querySelectorAll('.donutseg').forEach(seg=>{seg.style.strokeDashoffset=seg.dataset.off})}
+  (function buildTrail(){
+    const g=document.getElementById('trail'); if(!g)return;
+    const paths=[
+      {d:[[20,82],[120,66],[220,92],[320,84],[420,70],[545,78]],bias:.75},
+      {d:[[60,18],[92,82],[115,156],[100,232]],bias:.55},
+      {d:[[200,14],[216,82],[232,166],[260,236]],bias:.35},
+      {d:[[340,18],[350,92],[333,176],[355,232]],bias:.45},
+      {d:[[20,174],[140,160],[300,184],[545,166]],bias:.7}];
+    const colors=['#1E8E4E','#D4A017','#E8710A','#C0392B'];
+    let idx=0, rng=1;
+    function rand(){rng=(rng*16807)%2147483647;return rng/2147483647}
+    paths.forEach(p=>{
+      for(let s=0;s<p.d.length-1;s++){
+        const [x1,y1]=p.d[s],[x2,y2]=p.d[s+1];
+        const n=Math.max(6,Math.round(Math.hypot(x2-x1,y2-y1)/11));
+        for(let k=0;k<n;k++){
+          const t=k/n, x=x1+(x2-x1)*t+(rand()-0.5)*3, y=y1+(y2-y1)*t+(rand()-0.5)*3;
+          const r=rand();
+          const ci=r<p.bias?0:r<p.bias+.15?1:r<p.bias+.24?2:3;
+          const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx',x.toFixed(1));c.setAttribute('cy',y.toFixed(1));c.setAttribute('r',2.4);
+          c.setAttribute('fill',colors[ci]);c.setAttribute('class','mapdot');
+          c.style.animationDelay=(idx*0.004)+'s'; idx++;
+          g.appendChild(c);
+        }
+      }
+    });
+  })();
+
+  function typer(el,text,speed,done){
+    el.classList.add('caret');let i=0;
+    const iv=setInterval(()=>{el.textContent=text.slice(0,++i);
+      if(i>=text.length){clearInterval(iv);el.classList.remove('caret');done&&done()}},speed);
+    return iv;
+  }
+  function press(btn,tapEl){
+    if(!btn)return;
+    btn.classList.add('pressing');
+    if(tapEl){const r=btn.getBoundingClientRect(),pr=tapEl.parentElement.getBoundingClientRect();
+      tapEl.style.left=(r.left-pr.left+r.width/2-16)+'px';
+      tapEl.style.top=(r.top-pr.top+r.height/2-16)+'px';
+      tapEl.classList.remove('go');void tapEl.offsetWidth;tapEl.classList.add('go')}
+    setTimeout(()=>btn.classList.remove('pressing'),320);
+  }
+  function showScreen(phone,n){
+    phone.querySelectorAll('.appscr').forEach(s=>{
+      const sn=+s.dataset.s;
+      s.classList.toggle('on',sn===n);
+      s.classList.toggle('off',sn<n);
+    });
+  }
+  let kycTimers=[], cmpTimers=[];
+  function clearTimers(arr){arr.forEach(t=>{clearTimeout(t);clearInterval(t)});arr.length=0}
+  function after(arr,ms,fn){arr.push(setTimeout(fn,ms))}
+
+  function runKyc(){
+    clearTimers(kycTimers);
+    const ph=document.getElementById('kycphone'); if(!ph)return;
+    const cap=document.getElementById('kyccap');
+    const tap=document.getElementById('kyctap');
+    showScreen(ph,0);
+    ['kf-name','kf-phone','kf-op'].forEach(id=>document.getElementById(id).textContent='');
+    document.getElementById('idprog').style.width='0';
+    document.getElementById('idcard').classList.remove('scanning');
+    document.getElementById('idstatus').textContent='Position your ID card…';
+    const selfbox=document.getElementById('selfbox').parentElement;
+    selfbox.classList.remove('scanning');
+    document.getElementById('selfstatus').textContent='Hold still…';
+    cap.textContent='Step 1 · Citizen enters basic details';
+    after(kycTimers,700,()=>kycTimers.push(typer(document.getElementById('kf-name'),'Fatmata Kamara',55)));
+    after(kycTimers,1900,()=>kycTimers.push(typer(document.getElementById('kf-phone'),'+232 77 402 118',48)));
+    after(kycTimers,3200,()=>{document.getElementById('kf-op').textContent='Africell (auto‑detected)'});
+    after(kycTimers,4100,()=>{press(document.getElementById('kbtn0'),tap)});
+    after(kycTimers,4550,()=>{showScreen(ph,1);cap.textContent='Step 2 · National ID captured and scanned'});
+    after(kycTimers,5300,()=>{document.getElementById('idcard').classList.add('scanning');
+      document.getElementById('idstatus').textContent='Scanning…';
+      document.getElementById('idprog').style.width='100%'});
+    after(kycTimers,7100,()=>{document.getElementById('idcard').classList.remove('scanning');
+      document.getElementById('idstatus').innerHTML='<b style="color:#157A40">ID captured ✓ · NIN ····‑··42</b>'});
+    after(kycTimers,7900,()=>{press(document.getElementById('kbtn1'),tap)});
+    after(kycTimers,8350,()=>{showScreen(ph,2);cap.textContent='Step 3 · Selfie liveness & face match'});
+    after(kycTimers,9000,()=>{selfbox.classList.add('scanning');
+      document.getElementById('selfstatus').textContent='Matching against ID photo…'});
+    after(kycTimers,11000,()=>{selfbox.classList.remove('scanning');
+      document.getElementById('selfstatus').innerHTML='<b style="color:#157A40">Face match 98.2% ✓</b>'});
+    after(kycTimers,11900,()=>{showScreen(ph,3);cap.textContent='Step 4 · Verified — complaints now carry a real identity'});
+    after(kycTimers,15200,runKyc);
+  }
+  function runCmp(){
+    clearTimers(cmpTimers);
+    const ph=document.getElementById('cmpphone'); if(!ph)return;
+    const cap=document.getElementById('cmpcap');
+    const tap=document.getElementById('cmptap');
+    showScreen(ph,0);
+    document.getElementById('opc0').classList.remove('sel');
+    document.getElementById('opc1').classList.remove('sel');
+    document.getElementById('cf-desc').textContent='';
+    cap.textContent='Step 1 · Citizen selects the operator';
+    after(cmpTimers,900,()=>document.getElementById('opc0').classList.add('sel'));
+    after(cmpTimers,1600,()=>press(document.getElementById('cbtn0'),tap));
+    after(cmpTimers,2050,()=>{showScreen(ph,1);cap.textContent='Step 2 · Issue type + optional description'});
+    after(cmpTimers,2800,()=>document.getElementById('opc1').classList.add('sel'));
+    after(cmpTimers,3400,()=>cmpTimers.push(typer(document.getElementById('cf-desc'),'No internet since Monday near Mesima Rd',34)));
+    after(cmpTimers,5400,()=>press(document.getElementById('cbtn1'),tap));
+    after(cmpTimers,5850,()=>{showScreen(ph,2);cap.textContent='Step 3 · GPS + live signal captured automatically'});
+    after(cmpTimers,8200,()=>press(document.getElementById('cbtn2'),tap));
+    after(cmpTimers,8650,()=>{showScreen(ph,3);cap.textContent='Filed — and trackable to resolution'});
+    after(cmpTimers,13300,runCmp);
+  }
+  function onSlideEnter(i){
+    const s=slides[i];
+    if(s.querySelector('.ticker'))runTickers(s);
+    if(s.querySelector('.donutseg'))runDonut(s);
+    clearTimers(kycTimers);clearTimers(cmpTimers);
+    if(s.querySelector('#kycphone'))runKyc();
+    if(s.querySelector('#cmpphone'))runCmp();
+  }
+  onSlideEnter(0);
+})();
+</script>
